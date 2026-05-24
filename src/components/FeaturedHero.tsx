@@ -55,7 +55,7 @@ export default function FeaturedHero({ campaign }: { campaign: Campaign }) {
             <img
               src={campaign.partner_logo_url}
               alt={campaign.partner_name ?? ''}
-              style={{ height: '56px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+              style={{ height: '80px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           )}

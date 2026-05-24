@@ -81,10 +81,10 @@ export default function ClaimPage() {
     }}>
       <div className="card" style={{ maxWidth: '750px', width: '100%', backgroundColor: 'rgba(51, 65, 85, 0.7)', backdropFilter: 'blur(12px)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', marginTop: '2rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', marginBottom: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <img src="/talpa-logo.webp" alt="TALPA Logo" style={{ height: '70px', objectFit: 'contain' }} 
+          <img src="/talpa-logo.webp" alt="TALPA Logo" style={{ height: '120px', objectFit: 'contain' }} 
                onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           <div style={{ width: '1px', height: '50px', backgroundColor: 'rgba(255,255,255,0.2)' }}></div>
-          <img src="/brooks-brothers-logo.png" alt="Brooks Brothers Logo" style={{ height: '75px', objectFit: 'contain' }} 
+          <img src="/brooks-brothers-logo.png" alt="Brooks Brothers Logo" style={{ height: '130px', objectFit: 'contain' }} 
                onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         </div>
 
