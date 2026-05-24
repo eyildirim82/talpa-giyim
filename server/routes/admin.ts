@@ -3,16 +3,25 @@ import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 
 const router = Router();
 
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers['authorization'];
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
-  if (!token || token !== process.env.ADMIN_PASSWORD) {
+  if (!token) {
     res.status(401).json({ error: 'Yetkisiz erişim.' });
     return;
   }
 
-  next();
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      res.status(401).json({ error: 'Yetkisiz erişim.' });
+      return;
+    }
+    next();
+  } catch {
+    res.status(401).json({ error: 'Yetkisiz erişim.' });
+  }
 }
 
 router.use(requireAdmin);
