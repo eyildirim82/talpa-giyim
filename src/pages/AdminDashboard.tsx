@@ -10,6 +10,8 @@ import {
   ToggleLeft,
   ToggleRight,
   RefreshCw,
+  Upload,
+  ImageIcon,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
@@ -204,6 +206,98 @@ function FormField({
   );
 }
 
+function ImageField({
+  label,
+  value,
+  onChange,
+  onUpload,
+  uploading,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onUpload: (file: File) => Promise<void>;
+  uploading: boolean;
+}) {
+  return (
+    <div style={{ marginBottom: '0.875rem' }}>
+      <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.775rem', fontWeight: 500, marginBottom: '0.35rem' }}>
+        {label}
+      </label>
+
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://... veya yükle →"
+          style={{
+            flex: 1,
+            padding: '0.625rem 0.875rem',
+            borderRadius: '0.5rem',
+            border: '1px solid var(--border-color)',
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            color: 'var(--text-main)',
+            fontSize: '0.875rem',
+            fontFamily: 'inherit',
+            minWidth: 0,
+          }}
+        />
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            padding: '0 0.875rem',
+            borderRadius: '0.5rem',
+            border: '1px solid var(--border-color)',
+            backgroundColor: uploading ? 'rgba(15,23,42,0.3)' : 'rgba(15,23,42,0.6)',
+            color: uploading ? 'var(--text-muted)' : 'var(--text-main)',
+            fontSize: '0.8rem',
+            fontWeight: 600,
+            cursor: uploading ? 'not-allowed' : 'pointer',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.15s',
+          }}
+        >
+          <Upload size={14} />
+          {uploading ? 'Yükleniyor…' : 'Yükle'}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+            disabled={uploading}
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void onUpload(file).then(() => { e.target.value = ''; });
+            }}
+          />
+        </label>
+      </div>
+
+      {value && (
+        <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <img
+            src={value}
+            alt=""
+            style={{ height: '48px', maxWidth: '120px', objectFit: 'contain', borderRadius: '0.375rem', border: '1px solid var(--border-color)', backgroundColor: 'rgba(255,255,255,0.05)', padding: '4px' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+            {value.split('/').pop()}
+          </span>
+        </div>
+      )}
+
+      {!value && (
+        <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+          <ImageIcon size={13} /> Görsel seçilmedi
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
@@ -262,6 +356,9 @@ export default function AdminDashboard() {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [codeFiles, setCodeFiles] = useState<Record<string, File | undefined>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+
+  // Per-field image upload state: `${campaignId}-logo` | `${campaignId}-cover` | `new-logo` | `new-cover`
+  const [imgUploading, setImgUploading] = useState<Record<string, boolean>>({});
   const [newForm, setNewForm] = useState<NewForm>(EMPTY_NEW);
   const [creating, setCreating] = useState(false);
 
@@ -392,6 +489,37 @@ export default function AdminDashboard() {
       notify('error', err instanceof Error ? err.message : 'Kampanya oluşturulamadı.');
     } finally {
       setCreating(false);
+    }
+  }
+
+  // ── Image upload ──
+  async function uploadImage(file: File, fieldKey: string): Promise<string> {
+    setImgUploading((prev) => ({ ...prev, [fieldKey]: true }));
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const result = e.target?.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ filename: file.name, contentType: file.type, data: base64 }),
+      });
+      if (!res.ok) {
+        const d = (await res.json()) as { error?: string };
+        throw new Error(d.error ?? 'Yükleme başarısız');
+      }
+      const { url } = (await res.json()) as { url: string };
+      return url;
+    } finally {
+      setImgUploading((prev) => ({ ...prev, [fieldKey]: false }));
     }
   }
 
@@ -591,8 +719,26 @@ export default function AdminDashboard() {
                         <FormField label="İndirim Etiketi" value={form.discount_label} onChange={(v) => setEditField(campaign.id, 'discount_label', v)} placeholder="%15 İndirim" />
                         <FormField label="Partner Adı" value={form.partner_name} onChange={(v) => setEditField(campaign.id, 'partner_name', v)} />
                         <FormField label="Açıklama" value={form.description} onChange={(v) => setEditField(campaign.id, 'description', v)} textarea />
-                        <FormField label="Partner Logo URL" value={form.partner_logo_url} onChange={(v) => setEditField(campaign.id, 'partner_logo_url', v)} placeholder="https://..." />
-                        <FormField label="Kapak Görseli URL" value={form.cover_image_url} onChange={(v) => setEditField(campaign.id, 'cover_image_url', v)} placeholder="https://..." />
+                        <ImageField
+                          label="Partner Logo"
+                          value={form.partner_logo_url}
+                          onChange={(v) => setEditField(campaign.id, 'partner_logo_url', v)}
+                          uploading={!!imgUploading[`${campaign.id}-logo`]}
+                          onUpload={async (file) => {
+                            const url = await uploadImage(file, `${campaign.id}-logo`);
+                            setEditField(campaign.id, 'partner_logo_url', url);
+                          }}
+                        />
+                        <ImageField
+                          label="Kapak Görseli"
+                          value={form.cover_image_url}
+                          onChange={(v) => setEditField(campaign.id, 'cover_image_url', v)}
+                          uploading={!!imgUploading[`${campaign.id}-cover`]}
+                          onUpload={async (file) => {
+                            const url = await uploadImage(file, `${campaign.id}-cover`);
+                            setEditField(campaign.id, 'cover_image_url', url);
+                          }}
+                        />
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                           <FormField label="Bitiş Tarihi" value={form.valid_until} onChange={(v) => setEditField(campaign.id, 'valid_until', v)} type="date" />
                           <FormField label="Üye Başına Maks. Kod" value={form.max_codes_per_user} onChange={(v) => setEditField(campaign.id, 'max_codes_per_user', v)} type="number" />
@@ -665,8 +811,26 @@ export default function AdminDashboard() {
                 <FormField label="İndirim Etiketi *" value={newForm.discount_label} onChange={(v) => setNewForm((p) => ({ ...p, discount_label: v }))} placeholder="%15 İndirim" required />
                 <FormField label="Partner Adı" value={newForm.partner_name} onChange={(v) => setNewForm((p) => ({ ...p, partner_name: v }))} placeholder="Brooks Brothers" />
                 <div style={{ gridColumn: '1 / -1' }}><FormField label="Açıklama" value={newForm.description} onChange={(v) => setNewForm((p) => ({ ...p, description: v }))} textarea /></div>
-                <FormField label="Partner Logo URL" value={newForm.partner_logo_url} onChange={(v) => setNewForm((p) => ({ ...p, partner_logo_url: v }))} placeholder="https://..." />
-                <FormField label="Kapak Görseli URL" value={newForm.cover_image_url} onChange={(v) => setNewForm((p) => ({ ...p, cover_image_url: v }))} placeholder="https://..." />
+                <ImageField
+                  label="Partner Logo"
+                  value={newForm.partner_logo_url}
+                  onChange={(v) => setNewForm((p) => ({ ...p, partner_logo_url: v }))}
+                  uploading={!!imgUploading['new-logo']}
+                  onUpload={async (file) => {
+                    const url = await uploadImage(file, 'new-logo');
+                    setNewForm((p) => ({ ...p, partner_logo_url: url }));
+                  }}
+                />
+                <ImageField
+                  label="Kapak Görseli"
+                  value={newForm.cover_image_url}
+                  onChange={(v) => setNewForm((p) => ({ ...p, cover_image_url: v }))}
+                  uploading={!!imgUploading['new-cover']}
+                  onUpload={async (file) => {
+                    const url = await uploadImage(file, 'new-cover');
+                    setNewForm((p) => ({ ...p, cover_image_url: url }));
+                  }}
+                />
                 <FormField label="Bitiş Tarihi" value={newForm.valid_until} onChange={(v) => setNewForm((p) => ({ ...p, valid_until: v }))} type="date" />
                 <FormField label="Üye Başına Maks. Kod" value={newForm.max_codes_per_user} onChange={(v) => setNewForm((p) => ({ ...p, max_codes_per_user: v }))} type="number" />
                 <div style={{ gridColumn: '1 / -1' }}><FormField label="Kampanya Koşulları" value={newForm.terms} onChange={(v) => setNewForm((p) => ({ ...p, terms: v }))} textarea /></div>
