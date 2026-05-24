@@ -10,6 +10,11 @@
   --accent: #10b981;
   --danger: #ef4444;
   --border-color: #334155;
+  /* Partner logo sizes (used by components) */
+  --partner-logo-card: 56px; /* CampaignCard */
+  --partner-logo-hero: 80px; /* FeaturedHero */
+  --partner-logo-claim-primary: 120px; /* ClaimPage - TALPA */
+  --partner-logo-claim-secondary: 130px; /* ClaimPage - partner */
 }
 
 body {
@@ -321,5 +326,13 @@ input:focus {
 
   .navbar .nav-links a {
     margin-left: 0;
+  }
+
+  /* Responsive logo size overrides for smaller screens */
+  :root {
+    --partner-logo-card: 40px;
+    --partner-logo-hero: 56px;
+    --partner-logo-claim-primary: 80px;
+    --partner-logo-claim-secondary: 90px;
   }
 }

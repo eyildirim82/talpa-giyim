@@ -45,7 +45,7 @@ export default function CampaignCard({ campaign }: { campaign: Campaign }) {
             <img
               src={campaign.partner_logo_url}
               alt={campaign.partner_name ?? ''}
-              style={{ height: '56px', objectFit: 'contain' }}
+              style={{ height: 'var(--partner-logo-card)', objectFit: 'contain' }}
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           ) : (
