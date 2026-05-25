@@ -8,18 +8,31 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction): Pr
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
   if (!token) {
+    console.error('[admin] requireAdmin: token yok veya boş');
     res.status(401).json({ error: 'Yetkisiz erişim.' });
     return;
   }
 
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
-  if (error || !user) {
+    if (error) {
+      console.error('[admin] requireAdmin: getUser hatası:', error.message, error.status);
+      res.status(401).json({ error: 'Yetkisiz erişim.' });
+      return;
+    }
+
+    if (!user) {
+      console.error('[admin] requireAdmin: kullanıcı bulunamadı');
+      res.status(401).json({ error: 'Yetkisiz erişim.' });
+      return;
+    }
+
+    next();
+  } catch (err) {
+    console.error('[admin] requireAdmin: beklenmeyen hata:', err);
     res.status(401).json({ error: 'Yetkisiz erişim.' });
-    return;
   }
-
-  next();
 }
 
 router.use(requireAdmin);
