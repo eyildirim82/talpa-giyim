@@ -12,6 +12,9 @@ import {
   RefreshCw,
   Upload,
   ImageIcon,
+  Search,
+  Trash2,
+  History,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
@@ -45,6 +48,14 @@ type Stats = {
   usedCodes: number;
   remainingCodes: number;
 };
+
+type LookupResult =
+  | { found: false }
+  | { found: true; tc_no: string; codes: { code: string; claimed_at: string | null }[] };
+
+type PreviewCode = { code: string; is_used: boolean; claimed_by_tc: string | null; claimed_at: string | null };
+type PreviewClaim = { tc_no: string; claimed_at: string | null };
+type PreviewData = { codes: PreviewCode[]; claims: PreviewClaim[] };
 
 type EditForm = {
   title: string;
@@ -362,6 +373,63 @@ export default function AdminDashboard() {
   const [newForm, setNewForm] = useState<NewForm>(EMPTY_NEW);
   const [creating, setCreating] = useState(false);
 
+  // TC Sorgulama
+  const [lookupModal, setLookupModal] = useState<{ campaignId: string; title: string } | null>(null);
+  const [lookupTc, setLookupTc] = useState('');
+  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+
+  // Veritabanı Önizleme
+  const [previewData, setPreviewData] = useState<Record<string, PreviewData>>({});
+
+  async function handleReset() {
+    if (!window.confirm('Tüm kodlar ve talepler silinecek. Kampanyalar korunacak. Emin misiniz?')) return;
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/admin/reset', { method: 'DELETE', headers });
+      if (res.ok) {
+        notify('success', 'Tüm kodlar ve talepler silindi.');
+        setPreviewData({});
+        void fetchData();
+      } else {
+        notify('error', 'Sıfırlama başarısız.');
+      }
+    } catch {
+      notify('error', 'Sıfırlama başarısız.');
+    }
+  }
+
+  async function fetchPreview(campaignId: string) {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/campaigns/${campaignId}/preview`, { headers });
+      if (!res.ok) return;
+      const data = (await res.json()) as PreviewData;
+      setPreviewData((prev) => ({ ...prev, [campaignId]: data }));
+    } catch {
+      // önizleme hatası sessizce geçilir
+    }
+  }
+
+  async function handleLookup() {
+    if (!lookupModal || lookupTc.length !== 11) return;
+    setLookupLoading(true);
+    setLookupResult(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(
+        `/api/admin/campaigns/${lookupModal.campaignId}/lookup?tc_no=${lookupTc}`,
+        { headers }
+      );
+      const data = (await res.json()) as LookupResult;
+      setLookupResult(data);
+    } catch {
+      setLookupResult({ found: false });
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
   function notify(type: 'success' | 'error', text: string) {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
@@ -569,6 +637,17 @@ export default function AdminDashboard() {
     }
   }
 
+  const thStyle: React.CSSProperties = {
+    padding: '0.375rem 0.5rem',
+    textAlign: 'left',
+    fontWeight: 600,
+    borderBottom: '1px solid var(--border-color)',
+  };
+  const tdStyle: React.CSSProperties = {
+    padding: '0.35rem 0.5rem',
+    borderBottom: '1px solid rgba(51,65,85,0.5)',
+  };
+
   // ─── Render: Loading ──────────────────────────────────────────────────────
 
   if (sessionLoading) {
@@ -640,6 +719,13 @@ export default function AdminDashboard() {
           <button className="btn" style={{ width: 'auto' }} onClick={() => void fetchData()} disabled={fetching}>
             <RefreshCw size={15} /> Yenile
           </button>
+          <button
+            className="btn"
+            style={{ width: 'auto', backgroundColor: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)' }}
+            onClick={() => void handleReset()}
+          >
+            <Trash2 size={15} /> Sistemi Sıfırla
+          </button>
           <button className="btn" style={{ width: 'auto', backgroundColor: 'var(--border-color)' }} onClick={() => void handleLogout()}>
             Çıkış
           </button>
@@ -684,7 +770,11 @@ export default function AdminDashboard() {
               <div key={campaign.id} style={{ backgroundColor: 'var(--bg-card)', borderRadius: '0.875rem', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
                 {/* Card header */}
                 <div
-                  onClick={() => setExpandedId(expanded ? null : campaign.id)}
+                  onClick={() => {
+                    const newId = expanded ? null : campaign.id;
+                    setExpandedId(newId);
+                    if (newId) void fetchPreview(newId);
+                  }}
                   style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer', flexWrap: 'wrap' }}
                 >
                   <div style={{ flex: '1 1 200px', minWidth: 0 }}>
@@ -692,9 +782,33 @@ export default function AdminDashboard() {
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.775rem', fontFamily: 'monospace', marginTop: '0.1rem' }}>/{campaign.slug}</div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <Toggle label="Aktif" value={campaign.is_active} color="var(--accent)" onClick={(e) => { e.stopPropagation(); void handleToggle(campaign, 'is_active'); }} />
                     <Toggle label="Öne Çıkan" value={campaign.is_featured} color="#60a5fa" onClick={(e) => { e.stopPropagation(); void handleToggle(campaign, 'is_featured'); }} />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLookupModal({ campaignId: campaign.id, title: campaign.title });
+                        setLookupTc('');
+                        setLookupResult(null);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        background: 'none',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '0.375rem',
+                        padding: '0.35rem 0.6rem',
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <Search size={13} /> TC Sorgula
+                    </button>
                   </div>
 
                   <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.825rem' }}>
@@ -783,6 +897,67 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Veritabanı Önizleme */}
+                    {previewData[campaign.id] && (
+                      <div style={{ marginTop: '2rem', gridColumn: '1 / -1' }}>
+                        <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <History size={14} /> Veritabanı Önizleme
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>Kodlar (Son 20)</div>
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.775rem' }}>
+                                <thead>
+                                  <tr style={{ color: 'var(--text-muted)' }}>
+                                    <th style={thStyle}>Kod</th>
+                                    <th style={thStyle}>Durum</th>
+                                    <th style={thStyle}>TC</th>
+                                    <th style={thStyle}>Tarih</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {previewData[campaign.id].codes.length === 0 ? (
+                                    <tr><td colSpan={4} style={{ ...tdStyle, color: 'var(--text-muted)', textAlign: 'center' }}>Kayıt yok</td></tr>
+                                  ) : previewData[campaign.id].codes.map((c, i) => (
+                                    <tr key={i}>
+                                      <td style={{ ...tdStyle, fontFamily: 'monospace', color: 'var(--accent)' }}>{c.code}</td>
+                                      <td style={{ ...tdStyle, color: c.is_used ? 'var(--danger)' : 'var(--accent)' }}>{c.is_used ? 'Kullanıldı' : 'Kalan'}</td>
+                                      <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{c.claimed_by_tc ?? '—'}</td>
+                                      <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{c.claimed_at ? new Date(c.claimed_at).toLocaleString('tr-TR') : '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>Talepler (Son 20)</div>
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.775rem' }}>
+                                <thead>
+                                  <tr style={{ color: 'var(--text-muted)' }}>
+                                    <th style={thStyle}>TC</th>
+                                    <th style={thStyle}>Tarih</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {previewData[campaign.id].claims.length === 0 ? (
+                                    <tr><td colSpan={2} style={{ ...tdStyle, color: 'var(--text-muted)', textAlign: 'center' }}>Kayıt yok</td></tr>
+                                  ) : previewData[campaign.id].claims.map((cl, i) => (
+                                    <tr key={i}>
+                                      <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{cl.tc_no}</td>
+                                      <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{cl.claimed_at ? new Date(cl.claimed_at).toLocaleString('tr-TR') : '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -840,6 +1015,94 @@ export default function AdminDashboard() {
                 <button type="submit" className="btn" style={{ flex: 1 }} disabled={creating}><Plus size={16} />{creating ? 'Oluşturuluyor…' : 'Oluştur'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* TC Sorgulama Modal */}
+      {lookupModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setLookupModal(null); }}
+        >
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '1rem', border: '1px solid var(--border-color)', width: '100%', maxWidth: '480px', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1rem' }}>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{lookupModal.title} — </span>Üye Sorgusu
+              </h2>
+              <button onClick={() => setLookupModal(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.25rem' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={11}
+                placeholder="11 haneli TCKN giriniz"
+                value={lookupTc}
+                onChange={(e) => {
+                  setLookupTc(e.target.value.replace(/\D/g, '').slice(0, 11));
+                  setLookupResult(null);
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleLookup(); }}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'rgba(15,23,42,0.6)',
+                  color: 'var(--text-main)',
+                  fontFamily: 'inherit',
+                  fontSize: '0.875rem',
+                }}
+              />
+              <button
+                className="btn"
+                style={{ width: 'auto' }}
+                onClick={() => void handleLookup()}
+                disabled={lookupTc.length !== 11 || lookupLoading}
+              >
+                <Search size={15} /> {lookupLoading ? 'Sorgulanıyor…' : 'Sorgula'}
+              </button>
+            </div>
+
+            {lookupResult && (
+              <div
+                style={{
+                  padding: '1.25rem',
+                  borderRadius: '0.75rem',
+                  backgroundColor: 'rgba(15,23,42,0.5)',
+                  border: `1px solid ${lookupResult.found ? 'rgba(16,185,129,0.3)' : 'var(--border-color)'}`,
+                }}
+              >
+                {!lookupResult.found ? (
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                    Bu üye bu kampanyadan kod almamıştır.
+                  </p>
+                ) : (
+                  <div style={{ fontSize: '0.875rem' }}>
+                    <div style={{ color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                      TCKN: <span style={{ fontFamily: 'monospace', color: 'var(--text-main)' }}>{lookupResult.tc_no}</span>
+                    </div>
+                    {lookupResult.codes.map((c, i) => (
+                      <div key={i} style={{ marginBottom: i < lookupResult.codes.length - 1 ? '0.5rem' : 0 }}>
+                        <div>
+                          Kampanyadan aldığı kod:{' '}
+                          <span style={{ fontFamily: 'monospace', color: 'var(--accent)', fontWeight: 700 }}>{c.code}</span>
+                        </div>
+                        {c.claimed_at && (
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                            Alım tarihi: {new Date(c.claimed_at).toLocaleString('tr-TR')}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -166,6 +166,11 @@ input:focus {
   color: #6ee7b7;
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
+.alert.warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
 
 @keyframes fadeIn {
   from { opacity: 0; }

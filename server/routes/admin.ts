@@ -4,24 +4,16 @@ import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 const router = Router();
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // Use ADMIN_PASSWORD in env for admin routes
   const authHeader = req.headers['authorization'];
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const adminPassword = process.env.ADMIN_PASSWORD ?? '';
 
-  if (!token) {
+  if (!token || token !== adminPassword) {
     res.status(401).json({ error: 'Yetkisiz erişim.' });
     return;
   }
-
-  try {
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !user) {
-      res.status(401).json({ error: 'Yetkisiz erişim.' });
-      return;
-    }
-    next();
-  } catch {
-    res.status(401).json({ error: 'Yetkisiz erişim.' });
-  }
+  next();
 }
 
 router.use(requireAdmin);
@@ -130,18 +122,132 @@ router.post('/admin/campaigns/:id/codes', async (req: Request, res: Response) =>
     code,
     is_used: false,
   }));
-
   try {
-    const { data, error } = await supabaseAdmin
+    // Detect duplicates first
+    const codesOnly = (codes as string[]).map((c) => c.trim()).filter(Boolean);
+    const { data: existing } = await supabaseAdmin
       .from('campaign_codes')
-      .insert(rows)
-      .select();
+      .select('code')
+      .eq('campaign_id', id)
+      .in('code', codesOnly);
 
-    if (error) throw error;
-    res.json({ success: true, inserted: data?.length ?? 0 });
+    const existingSet = new Set((existing ?? []).map((r: any) => r.code));
+    const toInsert = rows.filter((r) => !existingSet.has(r.code));
+
+    let insertedCount = 0;
+    if (toInsert.length > 0) {
+      const { data: insData, error: insError } = await supabaseAdmin
+        .from('campaign_codes')
+        .insert(toInsert)
+        .select();
+      if (insError) throw insError;
+      insertedCount = insData?.length ?? 0;
+    }
+
+    res.json({
+      success: true,
+      inserted: insertedCount,
+      duplicates: Array.from(existingSet),
+    });
   } catch (err) {
     console.error('Kodlar yüklenemedi:', err);
     res.status(500).json({ error: 'Kodlar yüklenemedi.' });
+  }
+});
+
+// DELETE /api/admin/reset — tüm kodları ve talepleri sil (kampanyalar korunur)
+router.delete('/admin/reset', async (req: Request, res: Response) => {
+  try {
+    const { error: codesError } = await supabaseAdmin
+      .from('campaign_codes')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // tümünü sil
+
+    if (codesError) throw codesError;
+
+    const { error: claimsError } = await supabaseAdmin
+      .from('campaign_claims')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (claimsError) throw claimsError;
+
+    res.json({ success: true, message: 'Tüm kodlar ve talepler silindi.' });
+  } catch (err) {
+    console.error('Sistem sıfırlama hatası:', err);
+    res.status(500).json({ error: 'Sıfırlama başarısız.' });
+  }
+});
+
+// GET /api/admin/campaigns/:id/lookup?tc_no= — TC sorgusu
+router.get('/admin/campaigns/:id/lookup', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const tc_no = req.query['tc_no'] as string | undefined;
+
+  if (!tc_no) {
+    res.status(400).json({ error: 'tc_no parametresi zorunludur.' });
+    return;
+  }
+
+  try {
+    const { data: codes, error } = await supabaseAdmin
+      .from('campaign_codes')
+      .select('code, claimed_at')
+      .eq('campaign_id', id)
+      .eq('claimed_by_tc', tc_no)
+      .order('claimed_at', { ascending: true });
+
+    if (error) throw error;
+
+    if (!codes || codes.length === 0) {
+      res.json({ found: false });
+      return;
+    }
+
+    res.json({
+      found: true,
+      tc_no,
+      codes: codes.map((c: { code: string; claimed_at: string | null }) => ({
+        code: c.code,
+        claimed_at: c.claimed_at,
+      })),
+    });
+  } catch (err) {
+    console.error('TC sorgu hatası:', err);
+    res.status(500).json({ error: 'Sorgu başarısız.' });
+  }
+});
+
+// GET /api/admin/campaigns/:id/preview — son kodlar ve talepler
+router.get('/admin/campaigns/:id/preview', async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const [codesRes, claimsRes] = await Promise.all([
+      supabaseAdmin
+        .from('campaign_codes')
+        .select('code, is_used, claimed_by_tc, claimed_at')
+        .eq('campaign_id', id)
+        .order('claimed_at', { ascending: false, nullsFirst: false })
+        .limit(20),
+      supabaseAdmin
+        .from('campaign_claims')
+        .select('tc_no, claimed_at')
+        .eq('campaign_id', id)
+        .order('claimed_at', { ascending: false })
+        .limit(20),
+    ]);
+
+    if (codesRes.error) throw codesRes.error;
+    if (claimsRes.error) throw claimsRes.error;
+
+    res.json({
+      codes: codesRes.data ?? [],
+      claims: claimsRes.data ?? [],
+    });
+  } catch (err) {
+    console.error('Önizleme hatası:', err);
+    res.status(500).json({ error: 'Önizleme alınamadı.' });
   }
 });
 
