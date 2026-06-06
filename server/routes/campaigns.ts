@@ -5,33 +5,38 @@ const router = Router();
 
 router.get('/campaigns', async (req: Request, res: Response) => {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('campaigns')
-      .select(
-        'id, slug, title, description, partner_name, partner_logo_url, cover_image_url, discount_label, is_featured, featured_order, valid_until, max_codes_per_user, terms'
-      )
-      .eq('is_active', true)
-      .order('featured_order', { ascending: false });
+    // Kampanyalar + stok sayımları tek RPC ile (eski N+1 yerine). Toplu e-posta
+    // anında her ziyaretçi için ayrı sayım sorgusu atılmasını önler.
+    const [{ data, error }, stockRes] = await Promise.all([
+      supabaseAdmin
+        .from('campaigns')
+        .select(
+          'id, slug, title, description, partner_name, partner_logo_url, cover_image_url, discount_label, is_featured, featured_order, valid_until, max_codes_per_user, terms'
+        )
+        .eq('is_active', true)
+        .order('featured_order', { ascending: false }),
+      supabaseAdmin.rpc('campaign_stock_counts'),
+    ]);
 
     if (error) throw error;
+    if (stockRes.error) throw stockRes.error;
 
-    const campaignsWithStock = await Promise.all(
-      (data ?? []).map(async (c) => {
-        const { count, error: countError } = await supabaseAdmin
-          .from('campaign_codes')
-          .select('*', { count: 'exact', head: true })
-          .eq('campaign_id', c.id)
-          .eq('is_used', false);
+    const stockMap = new Map<string, { total: number; used: number }>();
+    for (const row of (stockRes.data ?? []) as { campaign_id: string; total: number; used: number }[]) {
+      stockMap.set(row.campaign_id, { total: Number(row.total), used: Number(row.used) });
+    }
 
-        if (countError) throw countError;
-
-        return {
-          ...c,
-          has_codes: (count ?? 0) > 0,
-          is_low_stock: (count ?? 0) > 0 && (count ?? 0) <= 10,
-        };
-      })
-    );
+    const campaignsWithStock = (data ?? []).map((c) => {
+      const s = stockMap.get(c.id) ?? { total: 0, used: 0 };
+      const remaining = s.total - s.used;
+      // Eşik admin sağlık ekranıyla aynı: kalanın %15'i, en az 25 adet kala uyar.
+      const threshold = Math.max(Math.ceil(s.total * 0.15), 25);
+      return {
+        ...c,
+        has_codes: remaining > 0,
+        is_low_stock: remaining > 0 && remaining <= threshold,
+      };
+    });
 
     res.json(campaignsWithStock);
   } catch (err) {

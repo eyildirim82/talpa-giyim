@@ -41,6 +41,7 @@ function slugify(text: string): string {
 }
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
+import SystemHealth from '../components/SystemHealth';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -798,6 +799,9 @@ export default function AdminDashboard() {
       </div>
 
       {message && <div className={`alert ${message.type}`}>{message.text}</div>}
+
+      {/* Sistem Sağlığı — anlık durum (servis / nabız / stok) */}
+      <SystemHealth getAuthHeaders={getAuthHeaders} />
 
       {/* Stats */}
       {stats && (

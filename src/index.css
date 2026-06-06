@@ -177,6 +177,10 @@ input:focus {
   to { opacity: 1; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Admin Dashboard styles */
 .admin-grid {
   display: grid;

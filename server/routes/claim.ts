@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { verifyMember } from '../lib/memberVerify.js';
 import { isValidTc } from '../lib/validateTc.js';
 import { claimLimiter } from '../lib/rateLimit.js';
+import { recordVerifyFailure } from '../lib/systemEvents.js';
 
 const router = Router();
 
@@ -13,6 +14,11 @@ type ClaimRpcResult =
 
 const BORCLU_MESSAGE =
   'Dernek aidat borçlarınız sebebiyle kampanya katılımınız sınırlandırılmıştır. Lütfen muhasebe birimi ile iletişime geçiniz.';
+
+// Üye doğrulama servisine ulaşılamadığında (servis arızası / anahtar hatası / zaman aşımı)
+// üyeyi "üye değil" diye reddetmek yerine geçici hata olarak bilgilendir.
+const SERVICE_UNAVAILABLE_MESSAGE =
+  'Üyelik doğrulama servisine şu an ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyin.';
 
 router.post('/claim-code', claimLimiter, async (req: Request, res: Response) => {
   const { tc_no, campaign_slug } = req.body as { tc_no: unknown; campaign_slug: unknown };
@@ -59,6 +65,12 @@ router.post('/claim-code', claimLimiter, async (req: Request, res: Response) => 
 
     // 2. Üye doğrula
     const verifyResult = await verifyMember(tc_no, campaign_slug);
+
+    if (verifyResult.status === 'hata') {
+      await recordVerifyFailure('claim', verifyResult.reason);
+      res.status(503).json({ error: SERVICE_UNAVAILABLE_MESSAGE });
+      return;
+    }
 
     if (verifyResult.status === 'borclu') {
       res.status(403).json({ error: BORCLU_MESSAGE });
@@ -138,6 +150,12 @@ router.post('/my-codes', claimLimiter, async (req: Request, res: Response) => {
     // 1. Üye doğrula
     const verifyResult = await verifyMember(tc_no);
     const status = verifyResult.status;
+
+    if (status === 'hata') {
+      await recordVerifyFailure('my-codes', verifyResult.reason);
+      res.status(503).json({ error: SERVICE_UNAVAILABLE_MESSAGE });
+      return;
+    }
 
     if (status === 'borclu') {
       res.status(403).json({ error: BORCLU_MESSAGE });

@@ -56,18 +56,20 @@ export default function HomePage() {
   const [lookupTc, setLookupTc] = useState('');
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupServiceDown, setLookupServiceDown] = useState(false);
   const [lookupResults, setLookupResults] = useState<any[] | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const handleLookupCodes = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLookupCodes = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!isValidTC(lookupTc)) {
       setLookupError('Lütfen geçerli bir T.C. Kimlik Numarası giriniz.');
       return;
     }
     setLookupLoading(true);
     setLookupError(null);
+    setLookupServiceDown(false);
     setLookupResults(null);
     try {
       const res = await fetch('/api/my-codes', {
@@ -76,6 +78,11 @@ export default function HomePage() {
         body: JSON.stringify({ tc_no: lookupTc }),
       });
       const data = await res.json();
+      // 503 = doğrulama servisine ulaşılamadı; tekrar denenebilir uyarı göster.
+      if (res.status === 503) {
+        setLookupServiceDown(true);
+        return;
+      }
       if (!res.ok) throw new Error(data.error ?? 'Beklenmeyen bir hata oluştu.');
       setLookupResults(data);
     } catch (err) {
@@ -205,6 +212,27 @@ export default function HomePage() {
               <div className="alert error" style={{ marginBottom: '1rem' }}>
                 <AlertCircle size={18} />
                 <span>{lookupError}</span>
+              </div>
+            )}
+
+            {lookupServiceDown && (
+              <div
+                className="alert warning"
+                style={{ marginBottom: '1rem', flexDirection: 'column', alignItems: 'stretch', gap: '0.75rem' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertCircle size={18} style={{ minWidth: '18px' }} />
+                  <span>Doğrulama servisine şu an ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyin.</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => void handleLookupCodes()}
+                  disabled={lookupLoading}
+                  style={{ width: 'auto', alignSelf: 'flex-start', padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
+                >
+                  {lookupLoading ? 'Deneniyor…' : 'Tekrar Dene'}
+                </button>
               </div>
             )}
 

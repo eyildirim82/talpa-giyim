@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { requireAdmin } from '../lib/requireAdmin.js';
+import { pingMemberService } from '../lib/memberHealth.js';
 
 const router = Router();
 
@@ -265,6 +266,103 @@ router.get('/admin/stats', async (req: Request, res: Response) => {
     console.error('İstatistikler alınamadı:', err);
     res.status(500).json({ error: 'İstatistikler alınamadı.' });
   }
+});
+
+// GET /api/admin/health — sağlık ekranı için anlık durum
+// (servis hataları + sistem nabzı + kampanya bazında stok). Toplu stok sorgusu RPC ile.
+router.get('/admin/health', async (req: Request, res: Response) => {
+  try {
+    const now = new Date();
+    const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+
+    // "Bugün" = İstanbul (UTC+3) günü. Gün başlangıcının UTC karşılığını hesapla.
+    const ist = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+    const istMidnightUtc = new Date(
+      Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 0, 0, 0) - 3 * 60 * 60 * 1000
+    ).toISOString();
+
+    const [failCountRes, lastFailRes, lastClaimRes, todayCountRes, campaignsRes, stockRes] =
+      await Promise.all([
+        supabaseAdmin
+          .from('system_verify_failures')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', thirtyMinAgo),
+        supabaseAdmin
+          .from('system_verify_failures')
+          .select('created_at')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabaseAdmin
+          .from('campaign_codes')
+          .select('claimed_at')
+          .not('claimed_at', 'is', null)
+          .order('claimed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabaseAdmin
+          .from('campaign_codes')
+          .select('*', { count: 'exact', head: true })
+          .gte('claimed_at', istMidnightUtc),
+        supabaseAdmin
+          .from('campaigns')
+          .select('id, slug, title, is_active')
+          .order('is_active', { ascending: false }),
+        supabaseAdmin.rpc('campaign_stock_counts'),
+      ]);
+
+    if (campaignsRes.error) throw campaignsRes.error;
+    if (stockRes.error) throw stockRes.error;
+
+    const stockMap = new Map<string, { total: number; used: number }>();
+    for (const row of (stockRes.data ?? []) as { campaign_id: string; total: number; used: number }[]) {
+      stockMap.set(row.campaign_id, { total: Number(row.total), used: Number(row.used) });
+    }
+
+    const campaigns = (campaignsRes.data ?? []).map((c) => {
+      const s = stockMap.get(c.id) ?? { total: 0, used: 0 };
+      const remaining = s.total - s.used;
+      // Eşik: kalanın %15'i, ama küçük kampanyalar için en az 25 adet kala uyar.
+      const threshold = Math.max(Math.ceil(s.total * 0.15), 25);
+      let status: 'no_codes' | 'out' | 'low' | 'ok';
+      if (s.total === 0) status = 'no_codes';
+      else if (remaining <= 0) status = 'out';
+      else if (remaining <= threshold) status = 'low';
+      else status = 'ok';
+      return {
+        id: c.id,
+        slug: c.slug,
+        title: c.title,
+        is_active: c.is_active,
+        total: s.total,
+        used: s.used,
+        remaining,
+        status,
+      };
+    });
+
+    res.json({
+      now: now.toISOString(),
+      verifyFailures: {
+        last30m: failCountRes.count ?? 0,
+        lastAt: lastFailRes.data?.created_at ?? null,
+      },
+      pulse: {
+        lastClaimAt: lastClaimRes.data?.claimed_at ?? null,
+        todayCount: todayCountRes.count ?? 0,
+      },
+      campaigns,
+    });
+  } catch (err) {
+    console.error('Sağlık verisi alınamadı:', err);
+    res.status(500).json({ error: 'Sağlık verisi alınamadı.' });
+  }
+});
+
+// GET /api/admin/health/probe — dış üye doğrulama servisini AKTİF yokla ("Şimdi test et")
+router.get('/admin/health/probe', async (req: Request, res: Response) => {
+  const result = await pingMemberService();
+  res.json(result);
 });
 
 // GET /api/admin/campaigns/:id/export — tüm kodları ve talepleri dışa aktar (CSV formatında)

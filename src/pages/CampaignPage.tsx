@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Gift, AlertCircle, CheckCircle, Loader2, Copy, Tag, Info, History, X } from 'lucide-react';
+import { Gift, AlertCircle, CheckCircle, Loader2, Copy, Tag, Info, History, X, RefreshCw } from 'lucide-react';
 import type { Campaign } from '../lib/types';
 
 type ClaimResponse = {
@@ -88,6 +88,7 @@ export default function CampaignPage() {
   const [tcNo, setTcNo] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [serviceDown, setServiceDown] = useState(false);
   const [result, setResult] = useState<ClaimResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -107,8 +108,8 @@ export default function CampaignPage() {
       .catch(() => navigate('/'));
   }, [slug, navigate]);
 
-  const handleClaim = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleClaim = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!campaign) return;
 
     if (!isValidTC(tcNo)) {
@@ -118,6 +119,7 @@ export default function CampaignPage() {
 
     setSubmitting(true);
     setClaimError(null);
+    setServiceDown(false);
     try {
       const res = await fetch('/api/claim-code', {
         method: 'POST',
@@ -125,6 +127,12 @@ export default function CampaignPage() {
         body: JSON.stringify({ tc_no: tcNo, campaign_slug: campaign.slug }),
       });
       const data = (await res.json()) as ClaimResponse;
+      // 503 = doğrulama servisine ulaşılamadı. Bu üyeyle ilgili değil; kırmızı
+      // "üye değil" hatası yerine tekrar denenebilir bir uyarı gösteriyoruz.
+      if (res.status === 503) {
+        setServiceDown(true);
+        return;
+      }
       if (!res.ok) throw new Error(data.error ?? 'Beklenmeyen bir hata oluştu.');
       setResult(data);
     } catch (err) {
@@ -251,6 +259,39 @@ export default function CampaignPage() {
           <div className="alert error">
             <AlertCircle size={20} style={{ minWidth: '20px' }} />
             <span>{claimError}</span>
+          </div>
+        )}
+
+        {/* Servis ulaşılamıyor — tekrar denenebilir uyarı */}
+        {serviceDown && !result && (
+          <div
+            className="alert warning"
+            style={{ marginBottom: '1.5rem', flexDirection: 'column', alignItems: 'stretch', gap: '0.75rem' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertCircle size={20} style={{ minWidth: '20px' }} />
+              <span>
+                Üyelik doğrulama servisine şu an ulaşılamıyor. Üyeliğinizle ilgili bir sorun değildir;
+                lütfen birkaç dakika sonra tekrar deneyin.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void handleClaim()}
+              disabled={submitting}
+              style={{ width: 'auto', alignSelf: 'flex-start' }}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Deneniyor…
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={18} /> Tekrar Dene
+                </>
+              )}
+            </button>
           </div>
         )}
 
