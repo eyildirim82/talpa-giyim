@@ -12,4 +12,8 @@ export type Campaign = {
   valid_until: string | null;
   max_codes_per_user: number;
   terms: string | null;
+  is_active?: boolean;
+  has_codes?: boolean;
+  is_low_stock?: boolean;
 };
+

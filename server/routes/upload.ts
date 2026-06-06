@@ -1,17 +1,8 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
+import { requireAdmin } from '../lib/requireAdmin.js';
 
 const router = Router();
-
-async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const token = req.headers['authorization']?.replace('Bearer ', '') ?? '';
-  if (!token) { res.status(401).json({ error: 'Yetkisiz erişim.' }); return; }
-  try {
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !user) { res.status(401).json({ error: 'Yetkisiz erişim.' }); return; }
-    next();
-  } catch { res.status(401).json({ error: 'Yetkisiz erişim.' }); }
-}
 
 router.post('/admin/upload', requireAdmin, async (req: Request, res: Response) => {
   const { filename, contentType, data } = req.body as {

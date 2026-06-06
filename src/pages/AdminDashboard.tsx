@@ -15,7 +15,30 @@ import {
   Search,
   Trash2,
   History,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+
+function slugify(text: string): string {
+  const trMap: Record<string, string> = {
+    'ç': 'c', 'Ç': 'c',
+    'ğ': 'g', 'Ğ': 'g',
+    'ı': 'i', 'I': 'i',
+    'İ': 'i',
+    'ö': 'o', 'Ö': 'o',
+    'ş': 's', 'Ş': 's',
+    'ü': 'u', 'Ü': 'u',
+  };
+  let slug = text;
+  for (const key in trMap) {
+    slug = slug.replace(new RegExp(key, 'g'), trMap[key]);
+  }
+  return slug
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 
@@ -367,6 +390,33 @@ export default function AdminDashboard() {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [codeFiles, setCodeFiles] = useState<Record<string, File | undefined>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [uploadPreviews, setUploadPreviews] = useState<Record<string, { count: number; firstCodes: string[] } | undefined>>({});
+  const [exporting, setExporting] = useState<Record<string, boolean>>({});
+
+  async function handleExportCSV(campaignId: string, slug: string) {
+    setExporting((prev) => ({ ...prev, [campaignId]: true }));
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/campaigns/${campaignId}/export`, { headers });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug}-kod-raporu.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      notify('success', 'Rapor indirildi.');
+    } catch {
+      notify('error', 'Rapor oluşturulamadı.');
+    } finally {
+      setExporting((prev) => ({ ...prev, [campaignId]: false }));
+    }
+  }
 
   // Per-field image upload state: `${campaignId}-logo` | `${campaignId}-cover` | `new-logo` | `new-cover`
   const [imgUploading, setImgUploading] = useState<Record<string, boolean>>({});
@@ -445,6 +495,12 @@ export default function AdminDashboard() {
       ]);
 
       if (cRes.status === 401 || sRes.status === 401) {
+        await supabase.auth.signOut();
+        return;
+      }
+
+      if (cRes.status === 403 || sRes.status === 403) {
+        setAuthError('Bu hesabın yönetici yetkisi bulunmuyor.');
         await supabase.auth.signOut();
         return;
       }
@@ -685,15 +741,24 @@ export default function AdminDashboard() {
               autoComplete="email"
               style={{ padding: '0.875rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)', backgroundColor: 'rgba(15,23,42,0.5)', color: 'white', width: '100%' }}
             />
-            <input
-              type="password"
-              placeholder="Şifre"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              style={{ padding: '0.875rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)', backgroundColor: 'rgba(15,23,42,0.5)', color: 'white', width: '100%' }}
-            />
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Şifre"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                style={{ padding: '0.875rem 2.5rem 0.875rem 0.875rem', borderRadius: '0.5rem', border: '1px solid var(--border-color)', backgroundColor: 'rgba(15,23,42,0.5)', color: 'white', width: '100%', boxSizing: 'border-box' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '0.875rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             <button type="submit" className="btn" disabled={authLoading}>
               {authLoading ? 'Giriş yapılıyor…' : 'Giriş Yap'}
             </button>
@@ -745,12 +810,35 @@ export default function AdminDashboard() {
       )}
 
       {/* Campaigns header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
         <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Kampanyalar</h2>
         <button className="btn" style={{ width: 'auto' }} onClick={() => setShowNewModal(true)}>
           <Plus size={16} /> Yeni Kampanya
         </button>
       </div>
+
+      {/* Arama çubuğu */}
+      {campaigns.length > 0 && (
+        <div style={{ position: 'relative', marginBottom: '1.5rem', maxWidth: '400px' }}>
+          <input
+            type="text"
+            placeholder="Kampanya ara (Başlık veya Slug)..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.625rem 0.875rem 0.625rem 2.5rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border-color)',
+              backgroundColor: 'rgba(30, 41, 59, 0.6)',
+              color: 'white',
+              fontSize: '0.875rem',
+              boxSizing: 'border-box'
+            }}
+          />
+          <Search size={16} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        </div>
+      )}
 
       {/* Campaign list */}
       {fetching && campaigns.length === 0 ? (
@@ -761,7 +849,12 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {campaigns.map((campaign) => {
+          {campaigns
+            .filter((c) =>
+              c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              c.slug.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .map((campaign) => {
             const expanded = expandedId === campaign.id;
             const form = editForms[campaign.id];
             const usagePct = campaign.totalCodes > 0 ? Math.round((campaign.usedCodes / campaign.totalCodes) * 100) : 0;
@@ -867,17 +960,62 @@ export default function AdminDashboard() {
                       {/* Code upload */}
                       <div>
                         <h3 style={{ margin: '0 0 1.25rem', fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kod Yükleme</h3>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 0, marginBottom: '1rem', lineHeight: 1.6 }}>
-                          İndirim kodlarının bulunduğu Excel dosyasını seçin. İlk sütundaki değerler okunur.
-                        </p>
-                        <div className="input-group">
-                          <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setCodeFiles((prev) => ({ ...prev, [campaign.id]: e.target.files?.[0] }))} />
-                          {codeFiles[campaign.id] && <span style={{ fontSize: '0.8rem', color: 'var(--accent)' }}>{codeFiles[campaign.id]!.name}</span>}
+                        
+                        <div className="input-group" style={{ marginBottom: '0.875rem' }}>
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              setCodeFiles((prev) => ({ ...prev, [campaign.id]: file }));
+                              if (file) {
+                                try {
+                                  const codes = await readFirstColumn(file);
+                                  setUploadPreviews((prev) => ({
+                                    ...prev,
+                                    [campaign.id]: { count: codes.length, firstCodes: codes.slice(0, 3) }
+                                  }));
+                                } catch {
+                                  // ignore
+                                }
+                              } else {
+                                setUploadPreviews((prev) => ({ ...prev, [campaign.id]: undefined }));
+                              }
+                            }}
+                          />
+                          {codeFiles[campaign.id] && <div style={{ fontSize: '0.8rem', color: 'var(--accent)', marginTop: '0.35rem' }}>{codeFiles[campaign.id]!.name}</div>}
                         </div>
-                        <button className="btn" onClick={() => void handleUploadCodes(campaign.id)} disabled={!codeFiles[campaign.id] || !!uploading[campaign.id]}>
-                          <FileSpreadsheet size={16} />
-                          {uploading[campaign.id] ? 'Yükleniyor…' : 'Kodları Yükle'}
-                        </button>
+
+                        {uploadPreviews[campaign.id] && (
+                          <div style={{ marginBottom: '0.875rem', fontSize: '0.8rem', color: 'var(--accent)', backgroundColor: 'rgba(16,185,129,0.06)', padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid rgba(16,185,129,0.2)' }}>
+                            <strong>{uploadPreviews[campaign.id]!.count}</strong> kod tespit edildi.
+                            {uploadPreviews[campaign.id]!.firstCodes.length > 0 && (
+                              <span style={{ color: 'var(--text-muted)', marginLeft: '0.4rem' }}>
+                                (Örn: {uploadPreviews[campaign.id]!.firstCodes.join(', ')}...)
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '-0.25rem', marginBottom: '1rem', lineHeight: 1.5 }}>
+                          * Kodları tek sütun (A sütunu) halinde içeren Excel (.xlsx, .xls) veya CSV dosyası yükleyin.
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button className="btn" style={{ flex: 1, minWidth: '130px' }} onClick={() => void handleUploadCodes(campaign.id)} disabled={!codeFiles[campaign.id] || !!uploading[campaign.id]}>
+                            <FileSpreadsheet size={16} />
+                            {uploading[campaign.id] ? 'Yükleniyor…' : 'Kodları Yükle'}
+                          </button>
+                          <button
+                            className="btn"
+                            style={{ flex: 1, minWidth: '180px', backgroundColor: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)' }}
+                            onClick={() => void handleExportCSV(campaign.id, campaign.slug)}
+                            disabled={!!exporting[campaign.id]}
+                          >
+                            <Upload size={16} style={{ transform: 'rotate(180deg)' }} />
+                            {exporting[campaign.id] ? 'İndiriliyor…' : 'Raporu CSV Olarak İndir'}
+                          </button>
+                        </div>
 
                         <div style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: 'rgba(15,23,42,0.6)', borderRadius: '0.625rem', border: '1px solid var(--border-color)' }}>
                           <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', marginBottom: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kod Kullanım Özeti</div>
@@ -981,8 +1119,8 @@ export default function AdminDashboard() {
             </div>
             <form onSubmit={(e) => void handleCreate(e)}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
+                <div style={{ gridColumn: '1 / -1' }}><FormField label="Başlık *" value={newForm.title} onChange={(v) => setNewForm((p) => ({ ...p, title: v, slug: slugify(v) }))} placeholder="Brooks Brothers 2026" required /></div>
                 <div style={{ gridColumn: '1 / -1' }}><FormField label="Slug *" value={newForm.slug} onChange={(v) => setNewForm((p) => ({ ...p, slug: v }))} placeholder="brooks-brothers-2026" required /></div>
-                <div style={{ gridColumn: '1 / -1' }}><FormField label="Başlık *" value={newForm.title} onChange={(v) => setNewForm((p) => ({ ...p, title: v }))} placeholder="Brooks Brothers 2026" required /></div>
                 <FormField label="İndirim Etiketi *" value={newForm.discount_label} onChange={(v) => setNewForm((p) => ({ ...p, discount_label: v }))} placeholder="%15 İndirim" required />
                 <FormField label="Partner Adı" value={newForm.partner_name} onChange={(v) => setNewForm((p) => ({ ...p, partner_name: v }))} placeholder="Brooks Brothers" />
                 <div style={{ gridColumn: '1 / -1' }}><FormField label="Açıklama" value={newForm.description} onChange={(v) => setNewForm((p) => ({ ...p, description: v }))} textarea /></div>

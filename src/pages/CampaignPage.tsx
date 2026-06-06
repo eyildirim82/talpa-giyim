@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Gift, AlertCircle, CheckCircle, Loader2, Copy, Tag, Info, History } from 'lucide-react';
+import { Gift, AlertCircle, CheckCircle, Loader2, Copy, Tag, Info, History, X } from 'lucide-react';
 import type { Campaign } from '../lib/types';
 
 type ClaimResponse = {
@@ -91,6 +91,7 @@ export default function CampaignPage() {
   const [result, setResult] = useState<ClaimResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [showCopyToast, setShowCopyToast] = useState(false);
 
   useEffect(() => {
     fetch('/api/campaigns')
@@ -135,6 +136,8 @@ export default function CampaignPage() {
 
   const handleCopy = (code: string, index?: number) => {
     void navigator.clipboard.writeText(code);
+    setShowCopyToast(true);
+    setTimeout(() => setShowCopyToast(false), 2000);
     if (index !== undefined) {
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
@@ -248,6 +251,20 @@ export default function CampaignPage() {
           <div className="alert error">
             <AlertCircle size={20} style={{ minWidth: '20px' }} />
             <span>{claimError}</span>
+          </div>
+        )}
+
+        {/* Stock alerts */}
+        {campaign.has_codes === false && !result && (
+          <div className="alert error" style={{ marginBottom: '1.5rem' }}>
+            <AlertCircle size={20} style={{ minWidth: '20px' }} />
+            <span>Bu kampanyada dağıtılacak kod kalmamıştır. İlginiz için teşekkür ederiz.</span>
+          </div>
+        )}
+        {campaign.has_codes !== false && campaign.is_low_stock && !result && (
+          <div className="alert warning" style={{ marginBottom: '1.5rem' }}>
+            <AlertCircle size={20} style={{ minWidth: '20px' }} />
+            <span>Sınırlı sayıda kod kalmıştır. Kodunuzu hemen alın!</span>
           </div>
         )}
 
@@ -375,32 +392,74 @@ export default function CampaignPage() {
               <label htmlFor="tcNo" style={{ color: '#cbd5e1' }}>
                 T.C. Kimlik Numarası
               </label>
-              <input
-                id="tcNo"
-                type="text"
-                inputMode="numeric"
-                maxLength={11}
-                placeholder="11 haneli TCKN giriniz"
-                value={tcNo}
-                onChange={(e) => {
-                  setClaimError(null);
-                  setTcNo(e.target.value.replace(/\D/g, '').slice(0, 11));
-                }}
-                disabled={submitting}
-                autoComplete="off"
-                style={{
-                  backgroundColor: 'rgba(15, 23, 42, 0.8)',
-                  borderColor: 'rgba(255,255,255,0.1)',
-                }}
-              />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                  id="tcNo"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={11}
+                  autoFocus
+                  placeholder="11 haneli TCKN giriniz"
+                  value={tcNo}
+                  onChange={(e) => {
+                    setClaimError(null);
+                    setTcNo(e.target.value.replace(/\D/g, '').slice(0, 11));
+                  }}
+                  disabled={submitting || campaign.has_codes === false}
+                  autoComplete="off"
+                  style={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                    borderColor: tcNo.length === 11
+                      ? (isValidTC(tcNo) ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)')
+                      : 'rgba(255,255,255,0.1)',
+                    paddingRight: '3.5rem',
+                    width: '100%',
+                  }}
+                />
+                <div style={{ position: 'absolute', right: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {tcNo.length > 0 && !submitting && campaign.has_codes !== false && (
+                    <button
+                      type="button"
+                      onClick={() => setTcNo('')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: '0.2rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      title="Temizle"
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                  {tcNo.length === 11 && (
+                    isValidTC(tcNo) ? (
+                      <CheckCircle size={17} color="var(--accent)" />
+                    ) : (
+                      <AlertCircle size={17} color="var(--danger)" />
+                    )
+                  )}
+                </div>
+              </div>
             </div>
 
             <button
               type="submit"
               className="btn"
-              disabled={submitting || tcNo.length !== 11}
+              disabled={submitting || tcNo.length !== 11 || campaign.has_codes === false}
+              style={{
+                backgroundColor: campaign.has_codes === false ? '#334155' : undefined,
+                color: campaign.has_codes === false ? 'var(--text-muted)' : undefined,
+                cursor: campaign.has_codes === false ? 'not-allowed' : undefined,
+              }}
             >
-              {submitting ? (
+              {campaign.has_codes === false ? (
+                'Tükendi'
+              ) : submitting ? (
                 <>
                   <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
                   Doğrulanıyor…
@@ -411,7 +470,13 @@ export default function CampaignPage() {
                 </>
               )}
             </button>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <style>{`
+              @keyframes spin { to { transform: rotate(360deg); } }
+              @keyframes fadeIn {
+                from { opacity: 0; transform: translate(-50%, 10px); }
+                to { opacity: 1; transform: translate(-50%, 0); }
+              }
+            `}</style>
           </form>
         )}
 
@@ -446,6 +511,31 @@ export default function CampaignPage() {
           </div>
         )}
       </div>
+
+      {showCopyToast && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '2rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'var(--accent)',
+            color: '#0f172a',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '0.5rem',
+            fontWeight: 700,
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            animation: 'fadeIn 0.2s ease-out',
+          }}
+        >
+          <CheckCircle size={18} />
+          <span>Kod panoya kopyalandı!</span>
+        </div>
+      )}
     </div>
   );
 }

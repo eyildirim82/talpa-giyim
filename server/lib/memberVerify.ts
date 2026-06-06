@@ -38,7 +38,7 @@ export async function verifyMember(
       let data: ApiResponse | null = null;
       try {
         data = (await res.json()) as ApiResponse;
-      } catch (e) {
+      } catch {
         // ignore JSON parse errors
       }
 
@@ -79,5 +79,12 @@ export async function verifyMember(
   }
 
   console.error('TALPA Member API: all retries exhausted', lastError);
-  return { status: 'degil', reason: typeof lastError === 'object' && lastError && 'reason' in (lastError as any) ? (lastError as any).reason : undefined };
+  let reason: string | undefined = undefined;
+  if (typeof lastError === 'object' && lastError !== null && 'reason' in lastError) {
+    const errorObj = lastError as Record<string, unknown>;
+    if (typeof errorObj.reason === 'string') {
+      reason = errorObj.reason;
+    }
+  }
+  return { status: 'degil', reason };
 }

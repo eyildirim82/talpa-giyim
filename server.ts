@@ -8,7 +8,15 @@ import uploadRouter from './server/routes/upload.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+// Vercel/proxy arkasında gerçek istemci IP'sini (X-Forwarded-For) almak için.
+// Rate limit'in IP başına doğru çalışması buna bağlıdır.
+app.set('trust proxy', 1);
+
+// CORS: CORS_ORIGINS tanımlıysa yalnızca o origin'lere izin ver; aksi halde
+// (yerel geliştirme) tüm origin'lere açık kalır.
+const corsOrigins = process.env.CORS_ORIGINS?.split(',').map((s) => s.trim()).filter(Boolean);
+app.use(cors(corsOrigins && corsOrigins.length > 0 ? { origin: corsOrigins } : undefined));
+
 app.use(express.json({ limit: '10mb' }));
 
 app.use('/api', campaignsRouter);

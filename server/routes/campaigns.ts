@@ -14,7 +14,26 @@ router.get('/campaigns', async (req: Request, res: Response) => {
       .order('featured_order', { ascending: false });
 
     if (error) throw error;
-    res.json(data);
+
+    const campaignsWithStock = await Promise.all(
+      (data ?? []).map(async (c) => {
+        const { count, error: countError } = await supabaseAdmin
+          .from('campaign_codes')
+          .select('*', { count: 'exact', head: true })
+          .eq('campaign_id', c.id)
+          .eq('is_used', false);
+
+        if (countError) throw countError;
+
+        return {
+          ...c,
+          has_codes: (count ?? 0) > 0,
+          is_low_stock: (count ?? 0) > 0 && (count ?? 0) <= 10,
+        };
+      })
+    );
+
+    res.json(campaignsWithStock);
   } catch (err) {
     console.error('Kampanyalar alınamadı:', err);
     res.status(500).json({ error: 'Kampanyalar alınamadı.' });

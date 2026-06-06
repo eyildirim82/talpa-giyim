@@ -1,14 +1,29 @@
 import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { verifyMember } from '../lib/memberVerify.js';
+import { isValidTc } from '../lib/validateTc.js';
+import { claimLimiter } from '../lib/rateLimit.js';
 
 const router = Router();
 
-router.post('/claim-code', async (req: Request, res: Response) => {
+type ClaimRpcResult =
+  | { status: 'already_claimed'; codes: string[] }
+  | { status: 'no_codes'; codes: string[] }
+  | { status: 'claimed'; code: string; codes: string[]; limit_reached: boolean };
+
+const BORCLU_MESSAGE =
+  'Dernek aidat borçlarınız sebebiyle kampanya katılımınız sınırlandırılmıştır. Lütfen muhasebe birimi ile iletişime geçiniz.';
+
+router.post('/claim-code', claimLimiter, async (req: Request, res: Response) => {
   const { tc_no, campaign_slug } = req.body as { tc_no: unknown; campaign_slug: unknown };
 
   if (!tc_no || typeof tc_no !== 'string' || !campaign_slug || typeof campaign_slug !== 'string') {
     res.status(400).json({ error: 'tc_no ve campaign_slug zorunludur.' });
+    return;
+  }
+
+  if (!isValidTc(tc_no)) {
+    res.status(400).json({ error: 'Geçersiz T.C. Kimlik Numarası.' });
     return;
   }
 
@@ -32,9 +47,11 @@ router.post('/claim-code', async (req: Request, res: Response) => {
       return;
     }
 
+    // valid_until bir DATE alanıdır; kampanya o günün sonuna kadar geçerlidir.
+    // UTC tarih karşılaştırması ile "son geçerli günün başında dolma" hatası önlenir.
     if (campaign.valid_until) {
-      const validUntil = new Date(campaign.valid_until);
-      if (isFinite(validUntil.getTime()) && validUntil < new Date()) {
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+      if (campaign.valid_until < today) {
         res.status(400).json({ error: 'Bu kampanya geçerliliğini yitirmiştir.' });
         return;
       }
@@ -42,13 +59,88 @@ router.post('/claim-code', async (req: Request, res: Response) => {
 
     // 2. Üye doğrula
     const verifyResult = await verifyMember(tc_no, campaign_slug);
+
+    if (verifyResult.status === 'borclu') {
+      res.status(403).json({ error: BORCLU_MESSAGE });
+      return;
+    }
+
+    if (verifyResult.status === 'degil') {
+      res.status(403).json({
+        error: `TALPA üyelik kaydınıza ulaşılamamıştır.${verifyResult.reason ? ' (' + verifyResult.reason + ')' : ''}`,
+      });
+      return;
+    }
+
+    // 3. Atomik tahsis — limit kontrolü, kod seçimi ve claim kaydı tek transaction'da
+    //    (advisory lock + FOR UPDATE SKIP LOCKED). Yarış durumları DB tarafında çözülür.
+    const maxCodes = Number(campaign.max_codes_per_user) || 1;
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('claim_campaign_code', {
+      p_campaign_id: campaign.id,
+      p_tc_no: tc_no,
+      p_max_codes: maxCodes,
+    });
+
+    if (rpcError) throw rpcError;
+
+    const result = rpcData as ClaimRpcResult;
+
+    if (result.status === 'already_claimed') {
+      res.json({
+        alreadyClaimed: true,
+        codes: result.codes,
+        message: 'Bu kampanyadan daha önce kod aldınız.',
+      });
+      return;
+    }
+
+    if (result.status === 'no_codes') {
+      res.status(404).json({ error: 'Bu kampanyada dağıtılacak kod kalmamıştır.' });
+      return;
+    }
+
+    // result.status === 'claimed'
+    if (result.limit_reached) {
+      res.json({
+        alreadyClaimed: false,
+        limitReached: true,
+        codes: result.codes,
+        message: 'Kampanya kodunuz teslim edildi.',
+      });
+    } else {
+      res.json({
+        alreadyClaimed: false,
+        limitReached: false,
+        code: result.code,
+        message: 'Kampanya kodunuz başarıyla teslim edildi.',
+      });
+    }
+  } catch (err) {
+    console.error('Kod talep hatası:', err);
+    res.status(500).json({ error: 'Sistem hatası.' });
+  }
+});
+
+router.post('/my-codes', claimLimiter, async (req: Request, res: Response) => {
+  const { tc_no } = req.body as { tc_no: unknown };
+
+  if (!tc_no || typeof tc_no !== 'string') {
+    res.status(400).json({ error: 'tc_no zorunludur.' });
+    return;
+  }
+
+  if (!isValidTc(tc_no)) {
+    res.status(400).json({ error: 'Geçersiz T.C. Kimlik Numarası.' });
+    return;
+  }
+
+  try {
+    // 1. Üye doğrula
+    const verifyResult = await verifyMember(tc_no);
     const status = verifyResult.status;
 
     if (status === 'borclu') {
-      res.status(403).json({
-        error:
-          'Dernek aidat borçlarınız sebebiyle kampanya katılımınız sınırlandırılmıştır. Lütfen muhasebe birimi ile iletişime geçiniz.',
-      });
+      res.status(403).json({ error: BORCLU_MESSAGE });
       return;
     }
 
@@ -59,89 +151,37 @@ router.post('/claim-code', async (req: Request, res: Response) => {
       return;
     }
 
-    // 3. Kullanıcının bu kampanyada aldığı kodları bul
-    const { data: existingCodeRows, error: existingError } = await supabaseAdmin
+    // 2. Üye doğrulanırsa, claimed_by_tc = tc_no olan kodları bul ve kampanyaları ile eşleştir
+    const { data: claims, error: claimsError } = await supabaseAdmin
       .from('campaign_codes')
-      .select('code')
-      .eq('campaign_id', campaign.id)
-      .eq('claimed_by_tc', tc_no);
+      .select('code, claimed_at, campaigns ( id, slug, title, discount_label, partner_name, partner_logo_url )')
+      .eq('claimed_by_tc', tc_no)
+      .order('claimed_at', { ascending: false });
 
-    if (existingError) throw existingError;
+    if (claimsError) throw claimsError;
 
-    const existingCodes = (existingCodeRows ?? []).map((r: { code: string }) => r.code);
-    const maxCodes = Number(campaign.max_codes_per_user) || 1;
+    // 3. Verileri formatla
+    const formattedClaims = (claims ?? []).map((claim: any) => {
+      const campaign = Array.isArray(claim.campaigns) ? claim.campaigns[0] : claim.campaigns;
+      return {
+        code: claim.code,
+        claimed_at: claim.claimed_at,
+        campaign: campaign
+          ? {
+              id: campaign.id,
+              slug: campaign.slug,
+              title: campaign.title,
+              discount_label: campaign.discount_label,
+              partner_name: campaign.partner_name,
+              partner_logo_url: campaign.partner_logo_url,
+            }
+          : null,
+      };
+    });
 
-    if (existingCodes.length >= maxCodes) {
-      res.json({
-        alreadyClaimed: true,
-        codes: existingCodes,
-        message: 'Bu kampanyadan daha önce kod aldınız.',
-      });
-      return;
-    }
-
-    // 4. Kullanılmamış kod al
-    const { data: codeRow, error: codeError } = await supabaseAdmin
-      .from('campaign_codes')
-      .select('id, code')
-      .eq('campaign_id', campaign.id)
-      .eq('is_used', false)
-      .limit(1)
-      .maybeSingle();
-
-    if (codeError) throw codeError;
-
-    if (!codeRow) {
-      res.status(404).json({ error: 'Bu kampanyada dağıtılacak kod kalmamıştır.' });
-      return;
-    }
-
-    // 5. Optimistic lock ile kodu güncelle
-    const { data: updatedCode, error: updateError } = await supabaseAdmin
-      .from('campaign_codes')
-      .update({
-        is_used: true,
-        claimed_by_tc: tc_no,
-        claimed_at: new Date().toISOString(),
-      })
-      .eq('id', codeRow.id)
-      .eq('is_used', false)
-      .select('code')
-      .maybeSingle();
-
-    if (updateError) throw updateError;
-
-    if (!updatedCode) {
-      res.status(409).json({ error: 'Kod alınırken çakışma oluştu, lütfen tekrar deneyin.' });
-      return;
-    }
-
-    // 6. Talep kaydı oluştur
-    await supabaseAdmin
-      .from('campaign_claims')
-      .insert({ campaign_id: campaign.id, tc_no })
-      .then(() => null); // ON CONFLICT DO NOTHING — unique constraint bunu güvence altına alır
-
-    // 7. Başarı — limit kontrolü
-    const newCodes = [...existingCodes, updatedCode.code];
-
-    if (newCodes.length >= maxCodes) {
-      res.json({
-        alreadyClaimed: false,
-        limitReached: true,
-        codes: newCodes,
-        message: 'Kampanya kodunuz teslim edildi.',
-      });
-    } else {
-      res.json({
-        alreadyClaimed: false,
-        limitReached: false,
-        code: updatedCode.code,
-        message: 'Kampanya kodunuz başarıyla teslim edildi.',
-      });
-    }
+    res.json(formattedClaims);
   } catch (err) {
-    console.error('Kod talep hatası:', err);
+    console.error('Kodlar sorgulanamadı:', err);
     res.status(500).json({ error: 'Sistem hatası.' });
   }
 });

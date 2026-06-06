@@ -1,39 +1,8 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
+import { requireAdmin } from '../lib/requireAdmin.js';
 
 const router = Router();
-
-async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-
-  if (!token) {
-    console.error('[admin] requireAdmin: token yok veya boş');
-    res.status(401).json({ error: 'Yetkisiz erişim.' });
-    return;
-  }
-
-  try {
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-
-    if (error) {
-      console.error('[admin] requireAdmin: getUser hatası:', error.message, error.status);
-      res.status(401).json({ error: 'Yetkisiz erişim.' });
-      return;
-    }
-
-    if (!user) {
-      console.error('[admin] requireAdmin: kullanıcı bulunamadı');
-      res.status(401).json({ error: 'Yetkisiz erişim.' });
-      return;
-    }
-
-    next();
-  } catch (err) {
-    console.error('[admin] requireAdmin: beklenmeyen hata:', err);
-    res.status(401).json({ error: 'Yetkisiz erişim.' });
-  }
-}
 
 router.use(requireAdmin);
 
@@ -150,7 +119,7 @@ router.post('/admin/campaigns/:id/codes', async (req: Request, res: Response) =>
       .eq('campaign_id', id)
       .in('code', codesOnly);
 
-    const existingSet = new Set((existing ?? []).map((r: any) => r.code));
+    const existingSet = new Set((existing ?? []).map((r: { code: string }) => r.code));
     const toInsert = rows.filter((r) => !existingSet.has(r.code));
 
     let insertedCount = 0;
@@ -295,6 +264,62 @@ router.get('/admin/stats', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('İstatistikler alınamadı:', err);
     res.status(500).json({ error: 'İstatistikler alınamadı.' });
+  }
+});
+
+// GET /api/admin/campaigns/:id/export — tüm kodları ve talepleri dışa aktar (CSV formatında)
+router.get('/admin/campaigns/:id/export', async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    // 1. Kampanyayı bul
+    const { data: campaign, error: campError } = await supabaseAdmin
+      .from('campaigns')
+      .select('title, slug')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (campError) throw campError;
+    if (!campaign) {
+      res.status(404).json({ error: 'Kampanya bulunamadı.' });
+      return;
+    }
+
+    // 2. Tüm kodları çek
+    const { data: codes, error: codesError } = await supabaseAdmin
+      .from('campaign_codes')
+      .select('code, is_used, claimed_by_tc, claimed_at')
+      .eq('campaign_id', id)
+      .order('claimed_at', { ascending: false, nullsFirst: false });
+
+    if (codesError) throw codesError;
+
+    // CSV hücresini güvenli biçimde yaz: formül enjeksiyonunu (=,+,-,@,tab,CR ile
+    // başlayan değerler Excel'de çalışabilir) engelle ve tırnakları kaçır.
+    const csvCell = (value: unknown): string => {
+      let s = value == null ? '' : String(value);
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+
+    // 3. CSV oluştur (Excel Türkçe karakter desteği için UTF-8 BOM ekliyoruz)
+    let csv = '\uFEFF';
+    csv += 'İndirim Kodu,Kullanım Durumu,Kullanan T.C. No,Kullanım Tarihi\n';
+
+    (codes ?? []).forEach((c) => {
+      const status = c.is_used ? 'Kullanıldı' : 'Kullanılmadı';
+      const tc = c.claimed_by_tc ?? '';
+      const date = c.claimed_at ? new Date(c.claimed_at).toLocaleString('tr-TR') : '';
+      csv += `${csvCell(c.code)},${csvCell(status)},${csvCell(tc)},${csvCell(date)}\n`;
+    });
+
+    const filename = `${campaign.slug}-kod-raporu.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(csv);
+  } catch (err) {
+    console.error('Dışa aktarma hatası:', err);
+    res.status(500).json({ error: 'Rapor oluşturulamadı.' });
   }
 });
 
