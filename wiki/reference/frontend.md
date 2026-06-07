@@ -1,9 +1,9 @@
 # İstemci (Frontend) Uygulama ve Stil Rehberi
 
-**Summary**: TALPA Kampanyaları uygulamasının React 19 istemci mimarisi, yönlendirme kuralları (routing), vanilla CSS tasarım sistemi ve istemci tarafı T.C. Kimlik doğrulama algoritması.
+**Summary**: TALPA Kampanyaları uygulamasının React 19 istemci mimarisi, yönlendirme kuralları (routing), vanilla CSS tasarım sistemi, stok rozetleri/503 UX ve istemci tarafı T.C. Kimlik doğrulama algoritması.
 **Tags**: #frontend #react #vanilla-css #routing #tc-validation #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-05-26T12:35:00+03:00
+**Last Updated**: 2026-06-07T12:00:00+03:00
 
 ---
 
@@ -17,9 +17,9 @@
 
 Yönlendirme yönetimi `react-router-dom` kütüphanesi ile [App.tsx](../../src/App.tsx) içinde tanımlanmıştır:
 
-* `/` -> **[HomePage.tsx](../../src/pages/HomePage.tsx):** Aktif kampanyaların listelendiği ana sayfa arayüzü.
+* `/` -> **[HomePage.tsx](../../src/pages/HomePage.tsx):** Aktif kampanyaların listelendiği ana sayfa. Ayrıca üyenin TCKN girip daha önce aldığı tüm kodları görebildiği **"Kodlarımı Sorgula"** aracını barındırır (`POST /api/my-codes`).
 * `/kampanya/:slug` -> **[CampaignPage.tsx](../../src/pages/CampaignPage.tsx):** Üyenin T.C. Kimlik numarasını girip indirim kodu talep ettiği tekil kampanya detay sayfası.
-* `/admin` -> **[AdminDashboard.tsx](../../src/pages/AdminDashboard.tsx):** Yetkili kullanıcıların kampanyaları ve kod envanterini yönettiği arayüz.
+* `/admin` -> **[AdminDashboard.tsx](../../src/pages/AdminDashboard.tsx):** Yetkili kullanıcıların sistem sağlığını, kampanyaları ve kod envanterini yönettiği arayüz.
 
 ---
 
@@ -54,7 +54,31 @@ Uygulamanın görsel estetiği [index.css](../../src/index.css) dosyasındaki ko
 
 ### 2. `CampaignCard.tsx`
 * **Görevi:** Ana sayfada öne çıkan haricindeki diğer tüm aktif kampanyaları 2'li veya 3'lü grid düzeninde listelemek için kullanılan kart bileşenidir.
-* **Özellikler:** Kampanya başlığı, partner logo görseli, indirim oranı etiketi ve son katılım tarihini içerir.
+* **Özellikler:** Kampanya başlığı, partner logo görseli, indirim oranı etiketi ve son katılım tarihini içerir. Stok durumuna göre **"Tükendi"** (`has_codes === false`, buton kilitli) veya **"Son kodlar!"** (`is_low_stock`) rozeti gösterir.
+
+### 3. `SystemHealth.tsx`
+* **Görevi:** Yönetici panelinin en üstünde yer alan **Sistem Sağlığı** kartı; dış servis durumu, sistem nabzı ve stok durumunu canlı izler. Yalnızca admin tarafından görülür.
+* **Çalışma:** `/api/admin/health` (25 sn) ve `/api/admin/health/probe` (60 sn) uç noktalarını periyodik yoklar; sekme gizliyken durur. Detaylı kullanım için bkz. [admin.md](admin.md#-sistem-sa%C4%9Fl%C4%B1%C4%9F%C4%B1-paneli).
+* **Props:** `getAuthHeaders: () => Promise<Record<string,string>>` — her çağrıda canlı Supabase oturum token'ını okur.
+
+---
+
+## 📉 Stok Durumu Rozetleri (Sold-out / Low-stock)
+
+`/api/campaigns` her kampanyayla birlikte sunucuda türetilen `has_codes` ve `is_low_stock` bayraklarını döndürür (ham kod sayıları istemciye sızmaz). UI bu bayraklara göre davranır — [FeaturedHero.tsx](../../src/components/FeaturedHero.tsx), [CampaignCard.tsx](../../src/components/CampaignCard.tsx) ve [CampaignPage.tsx](../../src/pages/CampaignPage.tsx):
+
+* `has_codes === false` → **"Tükendi"** rozeti; "Kodu Al" butonu pasif/kilitli.
+* `is_low_stock === true` (ve stok var) → **"Son kodlar!"** uyarısı; buton aktif kalır.
+* İki bayrak da yoksa normal akış. Eşik backend ile birebir aynıdır: `max(ceil(total*0.15), 25)`.
+
+---
+
+## 🔌 Servis Ulaşılamıyor (503) Deneyimi
+
+Üye doğrulama servisi geçici olarak çökerse backend `degil` yerine **503** döner (bkz. [member-verification.md](member-verification.md)). İstemci bu durumu özel olarak ele alır: kullanıcıyı "üye değil" diye **kırmızı reddetmek yerine**, nötr bir bilgi kutusu ve **"Tekrar Dene"** butonu gösterir.
+
+* **[CampaignPage.tsx](../../src/pages/CampaignPage.tsx)** (kod alma): `res.status === 503` → "Doğrulama servisine şu an ulaşılamıyor… birkaç dakika sonra tekrar deneyin." + `RefreshCw` ikonlu Tekrar Dene.
+* **[HomePage.tsx](../../src/pages/HomePage.tsx)** (Kodlarımı Sorgula): aynı 503 mantığı; "Deneniyor…" / "Tekrar Dene".
 
 ---
 
@@ -83,6 +107,23 @@ function isValidTC(tc: string): boolean {
 }
 ```
 * **Kullanıcı Deneyimi:** T.C. Kimlik hanesi girişi esnasında sayısal olmayan tüm girdiler regex (`/\D/g`) ile temizlenir ve en fazla 11 karakter yazılmasına izin verilir. Hatalı biçim tespit edilirse arayüzde Türkçe hata bildirimi gösterilir.
+
+---
+
+## 🖼️ İstemci Tarafı Görsel Sıkıştırma (`imageCompress.ts`)
+
+Yöneticinin yüklediği logo/kapak görselleri Supabase Storage'a gönderilmeden **tarayıcıda** yeniden boyutlandırılıp sıkıştırılır ([src/lib/imageCompress.ts](../../src/lib/imageCompress.ts)). Böylece `campaign-images` bucket'ının 5 MB limiti aşılmaz ve üye sayfaları daha hızlı yüklenir.
+
+```typescript
+const optimized = await compressImage(file); // varsayılan: 1600px, q=0.82, ≤4.5MB
+```
+
+* `createImageBitmap` ile (yoksa `<img>`'e düşerek) çözer, canvas'a yeniden çizer.
+* En uzun kenarı **1600 px**'e ölçekler; hedef üst boyut **~4.5 MB** (limitin altında pay).
+* PNG/WebP **saydamlığını korumayı** dener; sığmazsa beyaz arka planlı **JPEG**'e düşer ve kalite 0.4'e kadar kademeli azaltılır.
+* **SVG/GIF** dokunulmadan bırakılır (vektör/animasyon bozulmasın). Küçültmeye gerek yoksa orijinal dosya olduğu gibi döner.
+
+Sıkıştırılmış dosya ardından signed upload URL ile doğrudan Storage'a yüklenir (bkz. [admin.md](admin.md#3-g%C3%B6rsel-y%C3%BCkleme-logo--kapak)).
 
 ## Related Notes
 

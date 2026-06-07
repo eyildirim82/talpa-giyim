@@ -3,7 +3,7 @@
 **Summary**: TALPA Kampanyaları uygulamasının geliştirici wiki ana sayfası, sistem dizin yapısı, yerel kurulum kılavuzu ve LLM Wiki kullanım rehberi.
 **Tags**: #wiki #index #documentation #setup #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-05-26T12:35:00+03:00
+**Last Updated**: 2026-06-07T12:00:00+03:00
 
 ---
 
@@ -81,6 +81,9 @@ VITE_SUPABASE_ANON_KEY=eyJ...       # anon key (frontend tarafında okuma amaçl
 # TALPA Üye Doğrulama Servisi
 TALPA_MEMBER_API_URL=https://talpa-uye.vercel.app/api/members/verify
 TALPA_API_KEY=xxxx                   # TALPA Member API için gizli anahtar
+# Opsiyonel: Sağlık ekranının aktif yoklaması için dış servisin /health ucu.
+# Boş bırakılırsa TALPA_MEMBER_API_URL'den (/members/verify -> /health) türetilir.
+TALPA_MEMBER_HEALTH_URL=
 
 # Uygulama Ayarları
 PORT=3001

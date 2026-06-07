@@ -3,7 +3,7 @@
 **Summary**: Projenin dizin yapısı ve her bir dosyanın üstlendiği görevlerin detaylı açıklamaları.
 **Tags**: #codebase #structure #directories #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-05-26T12:35:00+03:00
+**Last Updated**: 2026-06-07T12:00:00+03:00
 
 ---
 
@@ -21,7 +21,9 @@ talpa-giyim/
 │   └── index.ts                # Sunucusuz Express entry point
 ├── server/                     # Backend API Kaynak Kodları
 │   ├── lib/                    # Ortak Kütüphaneler ve Servisler
-│   │   ├── memberVerify.ts     # TALPA API doğrulama ve Retry mantığı
+│   │   ├── memberVerify.ts     # TALPA API doğrulama, Retry + 'hata' durumu
+│   │   ├── memberHealth.ts     # Dış servisi aktif yoklama (pingMemberService)
+│   │   ├── systemEvents.ts     # Doğrulama hatalarını system_verify_failures'a yazar
 │   │   ├── supabaseAdmin.ts    # Supabase service_role (Admin) istemcisi
 │   │   ├── requireAdmin.ts     # Admin yetki middleware'i (admins allowlist)
 │   │   ├── validateTc.ts       # Sunucu tarafı T.C. Kimlik No doğrulaması
@@ -34,10 +36,12 @@ talpa-giyim/
 ├── src/                        # Frontend (React) Kaynak Kodları
 │   ├── assets/                 # Statik Varlıklar (Görseller, logolar)
 │   ├── components/             # Yeniden Kullanılabilir Bileşenler
-│   │   ├── CampaignCard.tsx    # Kampanya listeleme kartı
-│   │   └── FeaturedHero.tsx    # Öne çıkan kampanya afişi (Hero)
+│   │   ├── CampaignCard.tsx    # Kampanya listeleme kartı (+ stok rozetleri)
+│   │   ├── FeaturedHero.tsx    # Öne çıkan kampanya afişi (Hero)
+│   │   └── SystemHealth.tsx    # Admin sistem sağlığı paneli (canlı izleme)
 │   ├── lib/                    # Frontend Yardımcı Kodları
 │   │   ├── supabase.ts         # Anonim Supabase okuma istemcisi
+│   │   ├── imageCompress.ts    # Yüklemeden önce tarayıcıda görsel sıkıştırma
 │   │   └── types.ts            # Paylaşılan TypeScript tipleri
 │   ├── pages/                  # Sayfa Arayüzleri
 │   │   ├── AdminDashboard.tsx  # Yönetim paneli arayüzü ve CRUD formları
@@ -68,11 +72,13 @@ talpa-giyim/
 ---
 
 ### Backend (`server/`) Dosyaları
-* **[server/lib/memberVerify.ts](../../server/lib/memberVerify.ts):** Dış TALPA Üye API'sine bağlanır. HTTP 429 rate limitlerinde ve 500 hatalarında akıllıca üstel yeniden denemeler gerçekleştirir.
+* **[server/lib/memberVerify.ts](../../server/lib/memberVerify.ts):** Dış TALPA Üye API'sine bağlanır. HTTP 429/5xx ve ağ hatalarında akıllıca üstel yeniden denemeler yapar; her istekte 8 sn timeout uygular. Servise ulaşılamazsa `degil` yerine ayrı bir `'hata'` durumu döner (gerçek üye haksız reddedilmez).
+* **[server/lib/memberHealth.ts](../../server/lib/memberHealth.ts):** `pingMemberService` — dış servisin `/health` ucunu 6 sn timeout'la aktif yoklar; sağlık ekranındaki "Şimdi test et" bunu kullanır. Sağlık URL'i `TALPA_MEMBER_HEALTH_URL`'den ya da verify URL'inden türetilir.
+* **[server/lib/systemEvents.ts](../../server/lib/systemEvents.ts):** `recordVerifyFailure` — doğrulama `'hata'` döndüğünde `system_verify_failures` tablosuna best-effort tek satır yazar (yazılamazsa istek akışını bozmaz).
 * **[server/lib/supabaseAdmin.ts](../../server/lib/supabaseAdmin.ts):** Yazma, güncelleme ve silme yetkisine sahip `SUPABASE_SERVICE_KEY` ile veritabanı bağlantısı açar. Güvenlik için istemci tarafına asla sızdırılmamalıdır.
-* **[server/routes/campaigns.ts](../../server/routes/campaigns.ts):** Kullanıcılara gösterilecek olan yayındaki kampanyaları `featured_order` sırasına göre veritabanından çekip döner.
-* **[server/routes/claim.ts](../../server/routes/claim.ts):** T.C. Kimlik doğrulaması yapar, aidat durumunu sorgular, limit aşımını kontrol eder ve optimistik kilit kullanarak üyeye güvenli şekilde indirim kodu tahsis eder.
-* **[server/routes/admin.ts](../../server/routes/admin.ts):** Yönetici paneli üzerindeki kampanya ekleme, düzenleme, TCKN sorgulama, envanter önizleme ve sistemi sıfırlama işlemlerini yürüten korumalı API rotalarını barındırır.
+* **[server/routes/campaigns.ts](../../server/routes/campaigns.ts):** Yayındaki kampanyaları `featured_order` sırasına göre döner. Stok sayımını `campaign_stock_counts()` RPC ile tek sorguda alır (N+1 yok) ve her kampanyaya `has_codes`/`is_low_stock` bayraklarını ekler.
+* **[server/routes/claim.ts](../../server/routes/claim.ts):** T.C. Kimlik doğrulaması yapar, aidat durumunu sorgular ve atomik RPC ile güvenli kod tahsisi yapar. Doğrulama `'hata'` dönerse 503 verir ve hatayı kaydeder. `/claim-code` ve `/my-codes` rotalarını barındırır.
+* **[server/routes/admin.ts](../../server/routes/admin.ts):** Yönetici paneli üzerindeki kampanya ekleme, düzenleme, TCKN sorgulama, envanter önizleme, CSV dışa aktarma ve sistemi sıfırlama işlemlerinin yanı sıra **sağlık** uç noktalarını (`/admin/health`, `/admin/health/probe`) barındıran korumalı API rotalarıdır.
 * **[server/routes/upload.ts](../../server/routes/upload.ts):** Yönetici panelinden yüklenen logo ve kapak resimlerini Base64 formatında alıp Supabase Storage `campaign-images` bucket'ına yükler.
 
 ---
@@ -82,8 +88,10 @@ talpa-giyim/
 * **[src/pages/HomePage.tsx](../../src/pages/HomePage.tsx):** API'den kampanyaları çeker. En üst sırada öne çıkan kampanyayı afiş olarak, diğerlerini ise grid şeklinde listeler. Yükleme esnasında skeleton kartlar gösterir.
 * **[src/pages/CampaignPage.tsx](../../src/pages/CampaignPage.tsx):** Üyenin T.CK.N. girdiği form sayfasını çizer. Algoritmik T.C. kontrolü yapar ve kodu başarıyla aldıktan sonra panoya kopyalama imkanı verir.
 * **[src/pages/AdminDashboard.tsx](../../src/pages/AdminDashboard.tsx):** Supabase Auth ile yönetici girişi yaptırır. Yeni kampanya ekleme modal'ını, toplu kod yükleme aracını, veritabanı önizleme tablolarını yönetir.
-* **[src/components/FeaturedHero.tsx](../../src/components/FeaturedHero.tsx):** Öne çıkan kampanyanın ana sayfada geniş afiş şeklinde gösterilmesini sağlayan görsel arayüz bileşenidir.
-* **[src/components/CampaignCard.tsx](../../src/components/CampaignCard.tsx):** Kampanyaların ana sayfadaki grid içerisinde kartlar halinde sergilenmesini sağlayan bileşendir.
+* **[src/components/FeaturedHero.tsx](../../src/components/FeaturedHero.tsx):** Öne çıkan kampanyayı geniş afiş şeklinde gösterir; stok bayraklarına göre "Tükendi"/"Son kodlar!" durumunu yansıtır.
+* **[src/components/CampaignCard.tsx](../../src/components/CampaignCard.tsx):** Kampanyaları grid içinde kart olarak sergiler; `has_codes`/`is_low_stock` bayraklarına göre stok rozeti gösterir.
+* **[src/components/SystemHealth.tsx](../../src/components/SystemHealth.tsx):** Admin panelinin en üstündeki canlı sistem sağlığı kartı; dış servis, sistem nabzı ve stok durumunu periyodik yoklayarak gösterir.
+* **[src/lib/imageCompress.ts](../../src/lib/imageCompress.ts):** Görselleri Storage'a yüklemeden önce tarayıcıda yeniden boyutlandırıp sıkıştırır (bucket 5 MB limiti için). `compressImage(file)` fonksiyonunu dışa açar.
 
 ## Related Notes
 

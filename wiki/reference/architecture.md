@@ -3,7 +3,7 @@
 **Summary**: TALPA Kampanyaları uygulamasının üç katmanlı sistem mimarisi, kod dağıtım/talep iş akışı (claim flow) ve optimistik kilit tabanlı eşzamanlılık kontrolü.
 **Tags**: #architecture #claim-flow #concurrency #cas #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-05-26T12:35:00+03:00
+**Last Updated**: 2026-06-07T12:00:00+03:00
 
 ---
 
@@ -76,8 +76,11 @@ sequenceDiagram
     rect rgb(20, 50, 30)
         Note over Server, MemberAPI: 2. Üyelik & Borç Kontrolü
         Server->>MemberAPI: verifyMember(tcNo, campaignSlug)
-        MemberAPI-->>Server: Durum ('uye' | 'borclu' | 'degil')
-        alt Durum: 'borclu'
+        MemberAPI-->>Server: Durum ('uye' | 'borclu' | 'degil' | 'hata')
+        alt Durum: 'hata' (servise ulaşılamadı)
+            Server->>DB: recordVerifyFailure('claim') (best-effort)
+            Server-->>Client: 503 "Servise ulaşılamıyor, birkaç dakika sonra tekrar deneyin."
+        else Durum: 'borclu'
             Server-->>Client: 403 "Aidat borçları sebebiyle kampanya katılımınız sınırlandırılmıştır."
         else Durum: 'degil'
             Server-->>Client: 403 "TALPA üyelik kaydınıza ulaşılamamıştır."
@@ -160,9 +163,37 @@ const { data: rpcData } = await supabaseAdmin.rpc('claim_campaign_code', {
 
 ---
 
+## 🩺 Sistem Sağlığı ve Gözlemlenebilirlik (Observability)
+
+Kampanyalar TALPA'nın toplu e-postasıyla duyurulduğu için tüm üyeler **aynı anda** sisteme girer (thundering herd). Tek bir yöneticinin en büyük riski **sessiz arıza**dır; bu yüzden sisteme bir "sinir sistemi" eklenmiştir. Üç sinyal toplanır:
+
+```mermaid
+graph LR
+    subgraph Backend
+        Verify[verifyMember] -- 'hata' --> Rec[recordVerifyFailure]
+        Rec --> SVF[(system_verify_failures)]
+        Health[GET /api/admin/health] --> SVF
+        Health --> SC[campaign_stock_counts RPC]
+        Probe[GET /api/admin/health/probe] --> Ping[pingMemberService]
+    end
+    Ping -- GET /health --> MemberAPI[TALPA Üye API]
+    SC --> Codes[(campaign_codes)]
+    Panel[SystemHealth.tsx] --> Health
+    Panel --> Probe
+```
+
+1. **Pasif hata günlüğü:** Her `hata` durumu `recordVerifyFailure` ile `system_verify_failures`'a yazılır (best-effort; yazılamazsa istek akışı bozulmaz). Sağlık ekranı son 30 dakikadaki hata sayısına bakar.
+2. **Aktif yoklama (probe):** `pingMemberService`, dış servisin `/health` ucunu 6 sn timeout'la GET'ler — iş mantığına dokunmadan "servis + DB ayakta mı" sorusunu yanıtlar.
+3. **Stok & nabız:** `campaign_stock_counts()` RPC kampanya başına `total`/`used` sayımını tek sorguda döner (hem sağlık ekranı hem public `/api/campaigns` aynı RPC'yi kullanır, N+1 yok). "Nabız" son kod tarihi + bugün dağıtılan adet.
+
+> [!NOTE]
+> **Renk mantığı (kasıtlı):** Ana ışık **yalnızca dış servis çökükse KIRMIZI** olur; stok tükenmesi **SARI** kalır (kırmızının alarm değerini korumak için). `/health` henüz yayında değilse panel servis durumunu kırmızı değil **gri** ("yayında değil") gösterir.
+
+---
+
 ## 🛡️ Hata ve Olağanüstü Durum Yönetimi
 
-1. **TALPA API Ağ Hataları:** Üye doğrulama API'si çökerse veya ağ hatası alınırsa, sistem üyenin haklarını korumak için hata logu yazar ve `"degil"` yanıtı döndürerek güvenlik tarafında kalır. API geçici olarak aşırı yüklenirse (429 Rate Limit), arka planda üstel geri çekilme (exponential backoff) ile 3 defaya kadar yeniden deneme (retry) gerçekleştirir.
+1. **TALPA API Ağ/Servis Hataları:** Üye doğrulama API'si çökerse, 401/5xx dönerse veya ağ/timeout (8 sn) alınırsa, sistem artık `"degil"` **dönmez** — bu gerçek üyeleri haksız yere reddediyordu. Bunun yerine `"hata"` durumu üretilir; claim/my-codes uç noktaları **503** döner (kullanıcı "tekrar deneyin" görür), olay `system_verify_failures` tablosuna pasif kaydedilir ve [Sistem Sağlık Ekranı](admin.md#-sistem-sa%C4%9Fl%C4%B1%C4%9F%C4%B1-paneli)'nde görünür. API geçici olarak aşırı yüklenirse (429 Rate Limit), arka planda üstel geri çekilme (exponential backoff) ile 3 defaya kadar yeniden deneme (retry) gerçekleştirilir; tüm denemeler tükenirse yine `"hata"` döner. Ayrıntı: [member-verification.md](member-verification.md).
 2. **Atomik Tutarlılık:** Kod tahsisi ve `campaign_claims` kaydı artık `claim_campaign_code` fonksiyonu içinde **aynı transaction'da** yapılır. Herhangi bir adım başarısız olursa transaction tamamen geri alınır; bu nedenle "kod işaretlendi ama claim yazılamadı" gibi yarım durumlar oluşmaz. Bir üye limitine ulaşmışsa fonksiyon yeni kod üretmeden mevcut kodlarını (`already_claimed`) döndürür.
 3. **Hız Sınırı (Rate Limit):** `/api/claim-code` ve `/api/my-codes` uç noktaları IP başına dakikada 10 istekle sınırlıdır (`express-rate-limit`). Bu, T.C. enumerasyonunu ve dış üye API'sinin kötüye kullanılmasını zorlaştırır. Aşıldığında **429** döner.
 4. **Sunucu Tarafı T.C. Doğrulaması:** İstemci doğrulamasına güvenilmez; `tc_no` sunucuda da algoritmik olarak doğrulanır (`server/lib/validateTc.ts`), geçersizse **400** döner.

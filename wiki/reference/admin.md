@@ -1,9 +1,9 @@
 # Yönetici (Admin) Paneli Kullanım Kılavuzu
 
-**Summary**: TALPA Kampanyaları uygulamasının Yönetici Paneli (/admin) kullanım kılavuzu; kimlik doğrulama, kampanya yönetimi, toplu kod yükleme ve canlı veri izleme süreçleri.
-**Tags**: #admin #dashboard #manual #talpa
+**Summary**: TALPA Kampanyaları uygulamasının Yönetici Paneli (/admin) kullanım kılavuzu; kimlik doğrulama, sistem sağlık ekranı, kampanya yönetimi, toplu kod yükleme ve canlı veri izleme süreçleri.
+**Tags**: #admin #dashboard #manual #system-health #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-05-26T12:35:00+03:00
+**Last Updated**: 2026-06-07T12:00:00+03:00
 
 ---
 
@@ -32,9 +32,28 @@ Yönetici paneline giriş, Supabase Auth mekanizması ile güvence altına alın
 
 ---
 
+## 🩺 Sistem Sağlığı Paneli
+
+Panelin **en üstünde**, giriş yapan yöneticinin sistemin durumunu tek bakışta görmesini sağlayan **Sistem Sağlığı** kartı yer alır ([SystemHealth.tsx](../../src/components/SystemHealth.tsx)). Amaç **sessiz arızayı** önlemektir: kampanyalar toplu e-postayla duyurulduğunda herkes aynı anda girer ve bir aksaklık fark edilmezse çok sayıda üye etkilenir.
+
+**Ana ışık (özet durum):**
+* 🟢 **Yeşil — "Her şey yolunda":** Dış servis çalışıyor ve stok sorunu yok.
+* 🟡 **Sarı — "Dikkat gerekiyor":** Servis aralıklı hata veriyor **veya** bir/birkaç kampanyada stok azaldı/bitti. (Stok sorunu kasıtlı olarak sarıdır — kırmızının alarm değeri korunur.)
+* 🔴 **Kırmızı — "Servis sorunu":** **Yalnızca** dış üye doğrulama servisi yanıt vermiyorsa yanar.
+
+**Üç alt panel:**
+1. **Üye Doğrulama Servisi:** Dış servisin durumu. **"Şimdi test et"** butonu `/api/admin/health/probe` ile servisi aktif yoklar (yanıt süresini ms olarak gösterir). Otomatik yoklama 60 sn'de bir yapılır. Ayrıca son 30 dakikadaki servis hatası sayısı (`system_verify_failures`) gösterilir. `/health` ucu henüz yayında değilse durum **gri** ("yayında değil") görünür — kırmızı değil.
+2. **Sistem Nabzı:** Son kodun ne zaman dağıtıldığı ("az önce", "5 dk önce"…) ve **bugün** (İstanbul saatiyle) dağıtılan toplam kod adedi. Bilinçli olarak renksizdir (yanlış alarm vermesin).
+3. **Stok Durumu:** Aktif kampanyaları kalan koda göre sıralar; her biri için ilerleme çubuğu ve `TÜKENDİ` / `KOD YOK` / `N kaldı` etiketi. Düşük stok eşiği: `max(ceil(total*0.15), 25)`.
+
+> [!NOTE]
+> Veri 25 sn'de bir, dış servis yoklaması 60 sn'de bir otomatik yenilenir; **sekme arka plandayken yenileme durur** (gereksiz yük ve dış servisi dövmemek için). Sağ üstteki 🔄 butonu anlık yeniler. Tüm veriler `/api/admin/health` ve `/api/admin/health/probe`'dan gelir (bkz. [api.md](api.md#11-sistem-sa%C4%9Fl%C4%B1k-durumu-health-snapshot)).
+
+---
+
 ## 📊 Genel İstatistikler (Dashboard)
 
-Giriş yapıldığında en üstte sistemin genel durumunu özetleyen 4 temel sayaç yer alır. Bu veriler `/api/admin/stats` uç noktasından çekilir:
+Sağlık panelinin altında sistemin genel durumunu özetleyen 4 temel sayaç yer alır. Bu veriler `/api/admin/stats` uç noktasından çekilir:
 1. **Toplam Kampanya:** Sistemdeki aktif ve pasif tüm kampanyaların sayısı.
 2. **Toplam Kod:** Sisteme yüklenmiş toplam indirim kodu adedi.
 3. **Dağıtılan Kod:** Üyeler tarafından teslim alınmış (`is_used = true`) kod adedi.
@@ -62,6 +81,12 @@ Kampanyalar listesinde her kampanya için aşağıdaki işlemler yapılabilir:
 
 ### 2. Kampanya Detaylarını Güncelleme
 Her kampanya kartının yanındaki ok ikonuna tıklanarak kampanya detay formu açılır. Formda yapılan değişiklikler **"Kaydet"** butonu ile sunucuya gönderilir (`PUT /api/admin/campaigns/:id`).
+
+### 3. Görsel Yükleme (Logo & Kapak)
+Partner logosu ve kapak görseli, URL elle girmek yerine dosya seçilerek yüklenebilir. Akış:
+1. Seçilen görsel **tarayıcıda sıkıştırılır** ([imageCompress.ts](../../src/lib/imageCompress.ts)): en uzun kenar 1600 px'e indirilir, hedef boyut ~4.5 MB (bucket limiti 5 MB'ın altında). PNG/WebP saydamlığı korunmaya çalışılır; sığmazsa beyaz arka planlı JPEG'e düşülür. SVG ve GIF olduğu gibi bırakılır.
+2. Sunucudan `POST /api/admin/upload` ile bir **signed upload URL** (`path` + `token`) alınır.
+3. İstemci dosyayı bu token ile **doğrudan Supabase Storage**'a yükler (`uploadToSignedUrl`) — dosya Vercel serverless üzerinden geçmez, böylece ~4.5 MB body limiti ve base64 şişmesi aşılmaz. Dönen `publicUrl` forma yazılır.
 
 ---
 

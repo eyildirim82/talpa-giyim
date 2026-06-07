@@ -3,7 +3,7 @@
 **Summary**: Supabase (PostgreSQL) veritabanı şeması, tablo yapıları (DDL), ERD diyagramı, indeks optimizasyonları ve Row Level Security (RLS) politikaları.
 **Tags**: #database #schema #ddl #rls #supabase #postgres
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-05-26T12:35:00+03:00
+**Last Updated**: 2026-06-07T12:00:00+03:00
 
 ---
 
@@ -61,7 +61,7 @@ erDiagram
 ```
 
 > [!NOTE]
-> `admins` tablosu (yönetici allowlist) kampanya tablolarıyla ilişkisizdir; yetkilendirme için ayrı durur. Ayrıca aynı Supabase projesi, TALPA Üye Doğrulama API'sine ait `members`, `member_campaign_access`, `member_lookup_log` ve `campaign_whitelist` tablolarını da barındırır — bunlar bu uygulama tarafından yazılmaz, dış üye servisinin domain'ine aittir.
+> `admins` tablosu (yönetici allowlist) ve `system_verify_failures` tablosu (sağlık ekranının doğrulama-hatası günlüğü) kampanya tablolarıyla ilişkisizdir; yetkilendirme/gözlemlenebilirlik için ayrı dururlar. Ayrıca aynı Supabase projesi, TALPA Üye Doğrulama API'sine ait `members`, `member_campaign_access`, `member_lookup_log` ve `campaign_whitelist` tablolarını da barındırır — bunlar bu uygulama tarafından yazılmaz, dış üye servisinin domain'ine aittir.
 
 ---
 
@@ -117,6 +117,19 @@ CREATE TABLE admins (
     created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 ALTER TABLE admins ENABLE ROW LEVEL SECURITY; -- policy yok => sadece service_role okur
+
+-- 5. Doğrulama Hatası Günlüğü (Sistem Sağlık Ekranı için)
+-- verifyMember 'hata' döndüğünde recordVerifyFailure() tek satır yazar.
+-- Sadece hata oluşunca yazıldığından normal trafikte neredeyse hiç büyümez.
+CREATE TABLE system_verify_failures (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    source TEXT NOT NULL,        -- 'claim' | 'my-codes'
+    reason TEXT                  -- opsiyonel hata açıklaması
+);
+ALTER TABLE system_verify_failures ENABLE ROW LEVEL SECURITY; -- policy yok => sadece service_role
+-- Sağlık ekranı "son 30 dk" sorgusunu hızlandırmak için:
+CREATE INDEX idx_verify_failures_created_at ON system_verify_failures(created_at DESC);
 ```
 
 ---
@@ -187,6 +200,30 @@ REVOKE ALL ON FUNCTION public.claim_campaign_code(uuid, text, int) FROM anon, au
 
 ---
 
+## 📦 Toplu Stok Sayım Fonksiyonu (`campaign_stock_counts`)
+
+Hem public `/api/campaigns` hem de admin `/api/admin/health` uç noktaları, kampanya başına `total`/`used` kod sayısına ihtiyaç duyar. Eski sürümde her kampanya için ayrı sayım sorgusu atılıyordu (N+1); toplu e-posta anında yüzlerce ziyaretçi × kampanya başına sorgu = veritabanı baskısı. Bu sayım **tek bir set-based fonksiyona** taşınmıştır:
+
+```sql
+CREATE OR REPLACE FUNCTION public.campaign_stock_counts()
+RETURNS TABLE(campaign_id uuid, total bigint, used bigint)
+LANGUAGE sql
+STABLE
+SET search_path TO ''
+AS $$
+  select campaign_id,
+         count(*)::bigint as total,
+         count(*) filter (where is_used)::bigint as used
+  from public.campaign_codes
+  group by campaign_id;
+$$;
+```
+
+* **`STABLE`** + `search_path TO ''`: yan etkisiz, salt-okunur ve güvenli arama yolu (şema enjeksiyonuna kapalı).
+* Sunucu dönen satırları bir `Map<campaign_id, {total, used}>`'e koyar; `remaining = total - used`, düşük stok eşiği `max(ceil(total*0.15), 25)`.
+
+---
+
 ## ⚡ İndeks Tanımlamaları ve Optimizasyon
 
 Veritabanının hızlı yanıt vermesi için kritik alanlarda şu indekslerin (Indexes) oluşturulması önerilir:
@@ -242,7 +279,7 @@ CREATE POLICY "Admin All Access Claims" ON campaign_claims
 > API Sunucusu veritabanına bağlanırken `SUPABASE_SERVICE_KEY` kullanmaktadır. Bu anahtar PostgreSQL üzerinde `service_role` yetkisi sağlar ve tüm RLS politikalarını doğrudan **bypass eder**. Bu sayede backend sorunsuz yazma yaparken, frontend tarafında kullanıcıların tüm kodları veya talep geçmişlerini çalması önlenir.
 
 > [!NOTE]
-> **RLS durumu (2026-06):** `campaigns`, `campaign_codes`, `campaign_claims` ve `admins` tablolarının tamamında **RLS etkindir**. Bu uygulamanın frontend'i bu tabloları anon istemci ile doğrudan sorgulamadığı (tüm veri Express/`service_role` üzerinden akar; frontend yalnızca `supabase.auth.*` kullanır) için ek policy tanımlamaya gerek yoktur — `service_role` RLS'i bypass etmeye devam eder, anon/authenticated rollerine ise deny-by-default uygulanır. Geçmişte bu üç kampanya tablosunda RLS devre dışıydı ve anon anahtarla doğrudan okunabiliyordu; bu açık aşağıdaki komutla kapatılmıştır:
+> **RLS durumu (2026-06):** `campaigns`, `campaign_codes`, `campaign_claims`, `admins` ve `system_verify_failures` tablolarının tamamında **RLS etkindir**. Bu uygulamanın frontend'i bu tabloları anon istemci ile doğrudan sorgulamadığı (tüm veri Express/`service_role` üzerinden akar; frontend yalnızca `supabase.auth.*` kullanır) için ek policy tanımlamaya gerek yoktur — `service_role` RLS'i bypass etmeye devam eder, anon/authenticated rollerine ise deny-by-default uygulanır. Geçmişte bu üç kampanya tablosunda RLS devre dışıydı ve anon anahtarla doğrudan okunabiliyordu; bu açık aşağıdaki komutla kapatılmıştır:
 > ```sql
 > ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
 > ALTER TABLE campaign_codes ENABLE ROW LEVEL SECURITY;

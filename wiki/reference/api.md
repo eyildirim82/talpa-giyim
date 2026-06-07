@@ -3,7 +3,7 @@
 **Summary**: TALPA Kampanyaları uygulamasının API uç noktaları dokümantasyonu; üye uç noktaları (public) ve korunan yönetici (admin) uç noktalarını içerir.
 **Tags**: #api #endpoints #routing #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-05-26T12:35:00+03:00
+**Last Updated**: 2026-06-07T12:00:00+03:00
 
 ---
 
@@ -18,8 +18,11 @@ API sunucusu, `/api` önekiyle hizmet verir. Üye uç noktaları halka açıkken
 > [!NOTE]
 > `/api/claim-code` ve `/api/my-codes` uç noktaları **IP başına dakikada 10 istekle** sınırlıdır; aşıldığında **429** döner. Ayrıca `tc_no` sunucu tarafında algoritmik olarak doğrulanır; geçersizse **400 "Geçersiz T.C. Kimlik Numarası."** döner.
 
+> [!IMPORTANT]
+> **503 — Doğrulama servisi geçici hata:** Üye doğrulama servisine ulaşılamazsa (`verifyMember` → `hata`) hem `/api/claim-code` hem de `/api/my-codes` **503** döner: `{ "error": "Üyelik doğrulama servisine şu an ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyin." }`. Bu durumda gerçek üye `degil` ile reddedilmez; olay `system_verify_failures` tablosuna kaydedilir. Bkz. [member-verification.md](member-verification.md#-yan%C4%B1t-durumlar%C4%B1-ve-i%C5%9F-mant%C4%B1%C4%9F%C4%B1-business-logic).
+
 ### 1. Aktif Kampanyaları Getir
-Aktif yayında olan (`is_active = true`) tüm kampanyaları listeler.
+Aktif yayında olan (`is_active = true`) tüm kampanyaları `featured_order` azalan sırada listeler. Her kampanya için stok bilgisi **tek bir RPC** (`campaign_stock_counts()`) ile toplanır; eski sürümdeki kampanya başına ayrı sayım sorgusu (N+1) kaldırılmıştır — toplu e-posta anında her ziyaretçi için yüzlerce sorgu atılmasını önler.
 
 * **URL:** `/api/campaigns`
 * **Metot:** `GET`
@@ -44,10 +47,13 @@ Aktif yayında olan (`is_active = true`) tüm kampanyaları listeler.
       "featured_order": 5,
       "valid_until": "2026-12-31",
       "max_codes_per_user": 1,
-      "terms": "Kampanya koşulları buraya yazılır..."
+      "terms": "Kampanya koşulları buraya yazılır...",
+      "has_codes": true,
+      "is_low_stock": false
     }
   ]
   ```
+  > **`has_codes` / `is_low_stock`:** Stok durumu sunucuda türetilir; ham kod sayıları **istemciye sızdırılmaz**. `has_codes = false` → stok tükendi ("Tükendi" rozeti, buton kilitli). `is_low_stock = true` → kalan kod eşiğin altında ("Son kodlar!" uyarısı). Eşik admin sağlık ekranıyla **aynıdır**: `max(ceil(total * 0.15), 25)` — yani kalanın %15'i, küçük kampanyalarda en az 25 adet.
 
 ---
 
@@ -120,6 +126,10 @@ TC Kimlik Numarası doğrulaması yaparak üyeye yeni indirim kodu tahsis eder.
     ```json
     { "error": "Kod alınırken çakışma oluştu, lütfen tekrar deneyin." }
     ```
+  * **503 Service Unavailable:** Üye doğrulama servisine ulaşılamadı (geçici).
+    ```json
+    { "error": "Üyelik doğrulama servisine şu an ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyin." }
+    ```
 
 ---
 
@@ -153,7 +163,7 @@ TC Kimlik doğrulaması yaparak, üyenin tüm kampanyalarda daha önce aldığı
     }
   ]
   ```
-* **Hata Yanıtları:** `400` (tc_no eksik), `403` (borçlu / üye değil), `500` (sistem hatası).
+* **Hata Yanıtları:** `400` (tc_no eksik/geçersiz), `403` (borçlu / üye değil), `503` (doğrulama servisine ulaşılamadı — tekrar denenebilir), `500` (sistem hatası).
 
 ---
 
@@ -319,6 +329,62 @@ Kampanyaya ait tüm kodları, kullanım durumlarını ve teslim alan T.C. numara
   curl -X GET http://localhost:3001/api/admin/campaigns/7fbe5012-e544-4822-a9b0-31db72b64d0b/export \
     -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ" -O
   ```
+
+---
+
+### 11. Sistem Sağlık Durumu (Health Snapshot)
+Sistem Sağlık Ekranını besleyen anlık durum: dış servis hataları, sistem nabzı ve kampanya bazında stok. Stok sayımları tek RPC (`campaign_stock_counts()`) ile alınır. Detay: [admin.md](admin.md#-sistem-sa%C4%9Fl%C4%B1%C4%9F%C4%B1-paneli).
+
+* **URL:** `/api/admin/health`
+* **Metot:** `GET`
+* **cURL Test Komutu:**
+  ```bash
+  curl -X GET http://localhost:3001/api/admin/health \
+    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ"
+  ```
+* **Başarılı Yanıt (200 OK):**
+  ```json
+  {
+    "now": "2026-06-07T09:00:00.000Z",
+    "verifyFailures": { "last30m": 0, "lastAt": null },
+    "pulse": { "lastClaimAt": "2026-06-07T08:58:12.000Z", "todayCount": 142 },
+    "campaigns": [
+      {
+        "id": "7fbe5012-...",
+        "slug": "brooks-brothers-2026",
+        "title": "Brooks Brothers Kampanyası",
+        "is_active": true,
+        "total": 500,
+        "used": 142,
+        "remaining": 358,
+        "status": "ok"
+      }
+    ]
+  }
+  ```
+  * `verifyFailures.last30m`: son 30 dakikadaki `system_verify_failures` kaydı sayısı.
+  * `pulse.todayCount`: **İstanbul (UTC+3)** gününde dağıtılan kod adedi (gün başlangıcı UTC'ye çevrilerek sayılır).
+  * `campaigns[].status`: `ok` · `low` (kalan ≤ eşik) · `out` (stok bitti) · `no_codes` (hiç kod yüklenmemiş). Eşik: `max(ceil(total*0.15), 25)`.
+
+---
+
+### 12. Dış Servisi Aktif Yokla (Probe — "Şimdi test et")
+Dış üye doğrulama servisinin `/health` ucunu aktif olarak yoklar; `uye/borclu/degil` iş mantığına dokunmaz, yalnızca servis + DB ayakta mı bakar. 6 sn timeout'lu.
+
+* **URL:** `/api/admin/health/probe`
+* **Metot:** `GET`
+* **cURL Test Komutu:**
+  ```bash
+  curl -X GET http://localhost:3001/api/admin/health/probe \
+    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ"
+  ```
+* **Başarılı Yanıt (200 OK):**
+  ```json
+  { "ok": true, "status": 200, "ms": 187, "detail": "ok" }
+  ```
+  * `ok=false, status=null` → ağ hatası/timeout (`detail`: `network` | `timeout`).
+  * `status=404` → `/health` ucu henüz yayında değil (dış `talpa-uye` deploy bekliyor); panel bunu **kırmızı değil gri** ("yayında değil") gösterir.
+  * Sağlık URL'i `TALPA_MEMBER_HEALTH_URL`'den; tanımlı değilse `TALPA_MEMBER_API_URL`'in `/members/verify` → `/health` dönüşümünden türetilir.
 
 ## Related Notes
 
