@@ -4,34 +4,32 @@ import { requireAdmin } from '../lib/requireAdmin.js';
 
 const router = Router();
 
+// Dosya verisini sunucu üzerinden geçirmek yerine, Supabase Storage için bir
+// "signed upload URL" üretiyoruz. İstemci dosyayı doğrudan Supabase'e yükler.
+// Böylece Vercel serverless'ın ~4.5MB body limiti ve base64 şişmesi devre dışı kalır.
 router.post('/admin/upload', requireAdmin, async (req: Request, res: Response) => {
-  const { filename, contentType, data } = req.body as {
-    filename: string;
-    contentType: string;
-    data: string; // base64
-  };
+  const { filename } = req.body as { filename: string };
 
-  if (!filename || !contentType || !data) {
-    res.status(400).json({ error: 'filename, contentType ve data zorunludur.' });
+  if (!filename) {
+    res.status(400).json({ error: 'filename zorunludur.' });
     return;
   }
 
   try {
-    const buffer = Buffer.from(data, 'base64');
     const ext = filename.split('.').pop() ?? 'bin';
     const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-    const { error: uploadError } = await supabaseAdmin.storage
+    const { data, error: signError } = await supabaseAdmin.storage
       .from('campaign-images')
-      .upload(uniqueName, buffer, { contentType, upsert: false });
+      .createSignedUploadUrl(uniqueName);
 
-    if (uploadError) throw uploadError;
+    if (signError) throw signError;
 
     const { data: { publicUrl } } = supabaseAdmin.storage
       .from('campaign-images')
       .getPublicUrl(uniqueName);
 
-    res.json({ url: publicUrl });
+    res.json({ path: data.path, token: data.token, publicUrl });
   } catch (err) {
     console.error('Görsel yükleme hatası:', err);
     res.status(500).json({ error: 'Görsel yüklenemedi.' });

@@ -241,12 +241,24 @@ Tüm yönetici API'leri HTTP `Authorization` başlığında geçerli bir JWT tok
 ### 5. Görsel Yükle (Image Upload)
 * **URL:** `/api/admin/upload`
 * **Metot:** `POST`
+* **Açıklama:** Dosya verisini sunucu üzerinden geçirmez. Supabase Storage için bir
+  *signed upload URL* (`path` + `token`) döner; istemci dosyayı bu token ile
+  doğrudan Supabase'e yükler (`uploadToSignedUrl`). Bu sayede Vercel serverless'ın
+  ~4.5MB istek gövdesi limiti ve base64 şişmesi devre dışı kalır.
 * **cURL Test Komutu:**
   ```bash
   curl -X POST http://localhost:3001/api/admin/upload \
     -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ" \
     -H "Content-Type: application/json" \
-    -d '{"filename": "logo.png", "contentType": "image/png", "data": "BASE64_GÖRSEL_VERİSİ"}'
+    -d '{"filename": "logo.png"}'
+  ```
+* **Başarılı Yanıt (200 OK):**
+  ```json
+  {
+    "path": "1700000000000-abc123.png",
+    "token": "SIGNED_UPLOAD_TOKEN",
+    "publicUrl": "https://<proje>.supabase.co/storage/v1/object/public/campaign-images/1700000000000-abc123.png"
+  }
   ```
 
 ---

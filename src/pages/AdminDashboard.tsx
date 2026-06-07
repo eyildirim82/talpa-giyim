@@ -621,28 +621,37 @@ export default function AdminDashboard() {
   async function uploadImage(file: File, fieldKey: string): Promise<string> {
     setImgUploading((prev) => ({ ...prev, [fieldKey]: true }));
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const result = e.target?.result as string;
-          resolve(result.split(',')[1]);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
+      // 1) Sunucudan signed upload URL al
       const headers = await getAuthHeaders();
       const res = await fetch('/api/admin/upload', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ filename: file.name, contentType: file.type, data: base64 }),
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
       });
       if (!res.ok) {
-        const d = (await res.json()) as { error?: string };
-        throw new Error(d.error ?? 'Yükleme başarısız');
+        // Hata yanıtı JSON olmayabilir (örn. Vercel'in düz metin 413'ü)
+        const text = await res.text();
+        let message = 'Yükleme başarısız';
+        try {
+          message = (JSON.parse(text) as { error?: string }).error ?? message;
+        } catch {
+          message = text || message;
+        }
+        throw new Error(message);
       }
-      const { url } = (await res.json()) as { url: string };
-      return url;
+      const { path, token, publicUrl } = (await res.json()) as {
+        path: string;
+        token: string;
+        publicUrl: string;
+      };
+
+      // 2) Dosyayı doğrudan Supabase Storage'a yükle (Vercel body limitini atlar)
+      const { error: uploadError } = await supabase.storage
+        .from('campaign-images')
+        .uploadToSignedUrl(path, token, file, { contentType: file.type });
+      if (uploadError) throw uploadError;
+
+      return publicUrl;
     } finally {
       setImgUploading((prev) => ({ ...prev, [fieldKey]: false }));
     }
