@@ -150,13 +150,40 @@ export default function HomePage() {
 
   const featured = campaigns
     .filter((c) => c.is_featured)
-    .sort((a, b) => (b.featured_order ?? 0) - (a.featured_order ?? 0))[0];
+    .sort((a, b) => (b.featured_order ?? 0) - (a.featured_order ?? 0));
 
-  const rest = campaigns.filter((c) => c !== featured);
+  const rest = campaigns.filter((c) => !c.is_featured);
 
   return (
     <div className="container">
-      {featured && <FeaturedHero campaign={featured} />}
+      {featured.length > 0 && (
+        <section style={{ marginBottom: '2rem' }}>
+          <h2
+            style={{
+              margin: '0 0 1.25rem',
+              fontSize: '0.8rem',
+              color: 'var(--text-muted)',
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Öne Çıkan Kampanyalar
+          </h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                featured.length === 1 ? '1fr' : 'repeat(auto-fit, minmax(340px, 1fr))',
+              gap: '1.5rem',
+            }}
+          >
+            {featured.map((campaign) => (
+              <FeaturedHero key={campaign.id} campaign={campaign} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Kodlarımı Sorgula Bölümü */}
       <div
@@ -405,7 +432,7 @@ export default function HomePage() {
 
       {rest.length > 0 && (
         <>
-          {featured && (
+          {featured.length > 0 && (
             <h2
               style={{
                 margin: '0 0 1.25rem',
