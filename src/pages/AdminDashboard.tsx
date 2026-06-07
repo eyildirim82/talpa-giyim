@@ -41,6 +41,7 @@ function slugify(text: string): string {
 }
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
+import { compressImage } from '../lib/imageCompress';
 import SystemHealth from '../components/SystemHealth';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -621,12 +622,16 @@ export default function AdminDashboard() {
   async function uploadImage(file: File, fieldKey: string): Promise<string> {
     setImgUploading((prev) => ({ ...prev, [fieldKey]: true }));
     try {
+      // 0) Yükleme öncesi görseli tarayıcıda küçült/sıkıştır.
+      //    Bucket'ın 5MB boyut limitini aşmayı önler ve sayfaları hızlandırır.
+      const optimized = await compressImage(file);
+
       // 1) Sunucudan signed upload URL al
       const headers = await getAuthHeaders();
       const res = await fetch('/api/admin/upload', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+        body: JSON.stringify({ filename: optimized.name, contentType: optimized.type }),
       });
       if (!res.ok) {
         // Hata yanıtı JSON olmayabilir (örn. Vercel'in düz metin 413'ü)
@@ -648,7 +653,7 @@ export default function AdminDashboard() {
       // 2) Dosyayı doğrudan Supabase Storage'a yükle (Vercel body limitini atlar)
       const { error: uploadError } = await supabase.storage
         .from('campaign-images')
-        .uploadToSignedUrl(path, token, file, { contentType: file.type });
+        .uploadToSignedUrl(path, token, optimized, { contentType: optimized.type });
       if (uploadError) throw uploadError;
 
       return publicUrl;
