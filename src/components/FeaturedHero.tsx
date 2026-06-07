@@ -75,52 +75,6 @@ export default function FeaturedHero({ campaign }: { campaign: Campaign }) {
           >
             <Tag size={13} /> {campaign.discount_label}
           </span>
-          <span
-            style={{
-              backgroundColor: 'rgba(96, 165, 250, 0.15)',
-              color: '#93c5fd',
-              border: '1px solid rgba(96, 165, 250, 0.3)',
-              borderRadius: '999px',
-              padding: '0.2rem 0.75rem',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-            }}
-          >
-            ÖNE ÇIKAN
-          </span>
-          {campaign.has_codes === false && (
-            <span
-              style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.18)',
-                color: 'var(--danger)',
-                border: '1px solid var(--danger)',
-                borderRadius: '999px',
-                padding: '0.25rem 0.875rem',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                letterSpacing: '0.05em',
-              }}
-            >
-              TÜKENDİ
-            </span>
-          )}
-          {campaign.has_codes !== false && campaign.is_low_stock && (
-            <span
-              style={{
-                backgroundColor: 'rgba(245, 158, 11, 0.18)',
-                color: '#f59e0b',
-                border: '1px solid #f59e0b',
-                borderRadius: '999px',
-                padding: '0.25rem 0.875rem',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                letterSpacing: '0.05em',
-              }}
-            >
-              TÜKENMEK ÜZERE
-            </span>
-          )}
         </div>
 
         <h2

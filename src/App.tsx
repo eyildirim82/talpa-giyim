@@ -9,7 +9,6 @@ function App() {
       <nav className="navbar">
         <NavLink to="/" className="brand">
           <img src="/talpa-logo.webp" alt="TALPA" style={{ height: '32px' }} />
-          <span>TALPA Kampanyaları</span>
         </NavLink>
         <div className="nav-links">
           <NavLink to="/" className={({ isActive }) => (isActive ? 'active' : '')}>

@@ -71,38 +71,6 @@ export default function CampaignCard({ campaign }: { campaign: Campaign }) {
             >
               <Tag size={11} /> {campaign.discount_label}
             </span>
-            {campaign.has_codes === false && (
-              <span
-                style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                  color: 'var(--danger)',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
-                  borderRadius: '999px',
-                  padding: '0.2rem 0.65rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                TÜKENDİ
-              </span>
-            )}
-            {campaign.has_codes !== false && campaign.is_low_stock && (
-              <span
-                style={{
-                  backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                  color: '#f59e0b',
-                  border: '1px solid rgba(245, 158, 11, 0.25)',
-                  borderRadius: '999px',
-                  padding: '0.2rem 0.65rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                TÜKENMEK ÜZERE
-              </span>
-            )}
           </div>
         </div>
 
