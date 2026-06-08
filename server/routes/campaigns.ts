@@ -118,8 +118,9 @@ router.get('/campaign-types', async (_req: Request, res: Response) => {
       .select('id, name, slug, sort_order')
       .order('sort_order', { ascending: true });
     if (error) throw error;
-    // Tür listesi nadiren değişir → uzun CDN cache.
-    res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    // Tür listesi nadiren değişir ama admin değişiklikleri (ekle/sil) vitrine
+    // hızlı yansımalı → kısa CDN cache.
+    res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
     res.json(data ?? []);
   } catch (err) {
     console.error('Türler alınamadı:', err);
