@@ -407,9 +407,14 @@ export default function CampaignDetail() {
       if (codes.length === 0) throw new Error('Geçerli kod bulunamadı.');
       const headers = await getAuthHeaders();
       const res = await fetch(`/api/admin/campaigns/${id}/codes`, { method: 'POST', headers, body: JSON.stringify({ codes }) });
-      const d = (await res.json()) as { inserted?: number; error?: string };
+      const d = (await res.json()) as { inserted?: number; duplicates?: string[]; error?: string };
       if (!res.ok) throw new Error(d.error);
-      notify('success', `${d.inserted ?? 0} kod yüklendi.`);
+      const dupCount = d.duplicates?.length ?? 0;
+      notify(
+        'success',
+        `${d.inserted ?? 0} kod yüklendi.` +
+          (dupCount > 0 ? ` ${dupCount} kod zaten kayıtlı olduğu için atlandı.` : '')
+      );
       setCodeFile(null);
       setCodeFileCount(null);
       await load();

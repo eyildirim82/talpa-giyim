@@ -169,37 +169,34 @@ router.post('/admin/campaigns/:id/codes', async (req: Request, res: Response) =>
     return;
   }
 
-  const rows = (codes as string[]).map((code) => ({
-    campaign_id: id,
-    code,
-    is_used: false,
-  }));
+  // Temizle: trim + boşları at + aynı yükleme içindeki tekrarları ele.
+  const uniqueCodes = Array.from(
+    new Set((codes as unknown[]).map((c) => String(c).trim()).filter(Boolean))
+  );
+  if (uniqueCodes.length === 0) {
+    res.status(400).json({ error: 'Geçerli bir kod listesi gönderin.' });
+    return;
+  }
+
+  const rows = uniqueCodes.map((code) => ({ campaign_id: id, code, is_used: false }));
   try {
-    // Detect duplicates first
-    const codesOnly = (codes as string[]).map((c) => c.trim()).filter(Boolean);
-    const { data: existing } = await supabaseAdmin
+    // Kodlar TÜM kampanyalarda benzersizdir (campaign_codes_code_key UNIQUE). Halihazırda
+    // (bu ya da başka bir kampanyada) var olan kodları ON CONFLICT DO NOTHING ile atla; tek
+    // bir çakışan kod tüm yüklemeyi düşürmesin. Geri dönen satırlar gerçekten eklenenler →
+    // kalanlar yinelenmiş sayılır.
+    const { data: insData, error: insError } = await supabaseAdmin
       .from('campaign_codes')
-      .select('code')
-      .eq('campaign_id', id)
-      .in('code', codesOnly);
+      .upsert(rows, { onConflict: 'code', ignoreDuplicates: true })
+      .select('code');
+    if (insError) throw insError;
 
-    const existingSet = new Set((existing ?? []).map((r: { code: string }) => r.code));
-    const toInsert = rows.filter((r) => !existingSet.has(r.code));
-
-    let insertedCount = 0;
-    if (toInsert.length > 0) {
-      const { data: insData, error: insError } = await supabaseAdmin
-        .from('campaign_codes')
-        .insert(toInsert)
-        .select();
-      if (insError) throw insError;
-      insertedCount = insData?.length ?? 0;
-    }
+    const insertedSet = new Set((insData ?? []).map((r: { code: string }) => r.code));
+    const duplicates = uniqueCodes.filter((code) => !insertedSet.has(code));
 
     res.json({
       success: true,
-      inserted: insertedCount,
-      duplicates: Array.from(existingSet),
+      inserted: insertedSet.size,
+      duplicates,
     });
   } catch (err) {
     console.error('Kodlar yüklenemedi:', err);
