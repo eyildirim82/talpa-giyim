@@ -4,7 +4,7 @@ import Home from './pages/Home';
 import MyCodes from './pages/MyCodes';
 import Archive from './pages/Archive';
 import CampaignDetail from './pages/CampaignDetail';
-import AdminDashboard from './pages/AdminDashboard';
+import AdminApp from './admin/AdminApp';
 
 function App() {
   return (
@@ -15,8 +15,8 @@ function App() {
         <Route path="/kodlarim" element={<MyCodes />} />
         <Route path="/arsiv" element={<Archive />} />
         <Route path="/kampanya/:slug" element={<CampaignDetail />} />
-        {/* Henüz eski tasarımda — sırayla yenilenecek */}
-        <Route path="/admin" element={<AdminDashboard />} />
+        {/* Admin (yeni, sol-menü kabuk) — nested rotalar */}
+        <Route path="/admin/*" element={<AdminApp />} />
       </Routes>
     </Router>
   );

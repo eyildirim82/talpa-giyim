@@ -628,3 +628,156 @@
     border-top: 1px solid var(--ds-border);
   }
 }
+
+/* ======================================================
+   ADMIN
+   ====================================================== */
+.ds-admin { display: grid; grid-template-columns: 224px 1fr; min-height: 100vh; }
+.ds-side {
+  border-right: 1px solid var(--ds-border);
+  background: var(--ds-bg-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1rem 0.75rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.ds-side__brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; padding: 0.4rem 0.6rem 1rem; }
+.ds-side__brand img { height: 24px; }
+.ds-side__link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--ds-r-sm);
+  color: var(--ds-ink-soft);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.ds-side__link:hover { background: #eceef1; color: var(--ds-ink); }
+.ds-side__link.active { background: var(--ds-accent-soft); color: var(--ds-accent); }
+
+.ds-admin__main { min-width: 0; display: flex; flex-direction: column; }
+.ds-admin__top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid var(--ds-border);
+}
+.ds-admin__acct { display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; color: var(--ds-ink-soft); }
+.ds-admin__title { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+.ds-admin__body { padding: 1.5rem; }
+
+.ds-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+.ds-stat { background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: var(--ds-r); padding: 1.1rem 1.25rem; }
+.ds-stat__label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ds-ink-faint); }
+.ds-stat__value { font-size: 2rem; font-weight: 800; margin-top: 0.3rem; }
+
+.ds-toolbar2 { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 1.25rem 0; }
+
+.ds-rowcard { background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: var(--ds-r); padding: 1rem 1.15rem; }
+.ds-rowcard + .ds-rowcard { margin-top: 0.6rem; }
+.ds-rowcard__top { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: space-between; }
+.ds-rowcard__actions { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+
+.ds-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--ds-r-full);
+  border: 1px solid var(--ds-border);
+  background: var(--ds-bg-subtle);
+  color: var(--ds-ink-soft);
+}
+.ds-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--ds-r-sm);
+  border: 1px solid var(--ds-border-strong);
+  background: var(--ds-surface);
+  color: var(--ds-ink-soft);
+  cursor: pointer;
+}
+.ds-toggle:hover { background: var(--ds-bg-subtle); }
+.ds-toggle.on { border-color: var(--ds-accent); color: var(--ds-accent); background: var(--ds-accent-soft); }
+
+.ds-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.ds-dot--live { background: var(--ds-success); }
+.ds-dot--scheduled { background: var(--ds-accent); }
+.ds-dot--expired { background: var(--ds-warning); }
+.ds-dot--archived { background: var(--ds-ink-faint); }
+.ds-dot--inactive { background: var(--ds-border-strong); }
+
+.ds-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 23, 38, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  z-index: 100;
+  overflow: auto;
+}
+.ds-modal {
+  background: var(--ds-surface);
+  border-radius: var(--ds-r-lg);
+  border: 1px solid var(--ds-border);
+  width: 100%;
+  max-width: 600px;
+  padding: 1.5rem;
+  box-shadow: var(--ds-shadow-lg);
+}
+.ds-modal__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.ds-formrow { margin-bottom: 0.9rem; }
+.ds-formrow label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--ds-ink-soft); margin-bottom: 0.3rem; }
+.ds-formrow textarea.ds-input { min-height: 72px; resize: vertical; }
+.ds-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+
+.ds-danger-zone { border: 1px solid #f6d9d6; background: var(--ds-danger-soft); border-radius: var(--ds-r); padding: 1.25rem; }
+
+@media (max-width: 760px) {
+  .ds-admin { grid-template-columns: 1fr; }
+  .ds-side {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 0.4rem;
+    scrollbar-width: none;
+  }
+  .ds-side::-webkit-scrollbar { display: none; }
+  .ds-side__brand { display: none; }
+  .ds-side__link { flex: 0 0 auto; }
+  .ds-grid2 { grid-template-columns: 1fr; }
+}
+
+/* ---------- Admin: kart / tablo / kolonlar ---------- */
+.ds-card2 { background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: var(--ds-r-lg); padding: 1.25rem; }
+.ds-card2 h3 { margin: 0 0 1rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ds-ink-faint); }
+.ds-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+.ds-tbl { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.ds-tbl th { text-align: left; font-weight: 600; color: var(--ds-ink-soft); border-bottom: 1px solid var(--ds-border); padding: 0.45rem 0.5rem; white-space: nowrap; }
+.ds-tbl td { border-bottom: 1px solid var(--ds-border); padding: 0.45rem 0.5rem; }
+.ds-tbl tr:last-child td { border-bottom: none; }
+.ds-tbl__mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; }
+.ds-progress { height: 6px; border-radius: 999px; background: var(--ds-border); overflow: hidden; margin-top: 0.5rem; }
+.ds-progress > div { height: 100%; background: var(--ds-accent); border-radius: 999px; transition: width 0.4s; }
+.ds-pager { display: flex; align-items: center; gap: 0.75rem; justify-content: center; margin-top: 0.9rem; font-size: 0.82rem; color: var(--ds-ink-soft); }
+
+@media (max-width: 760px) {
+  .ds-cols { grid-template-columns: 1fr; }
+}

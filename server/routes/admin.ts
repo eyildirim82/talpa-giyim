@@ -98,6 +98,41 @@ router.post('/admin/campaigns', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/campaigns/:id — tekil kampanya + kod istatistikleri (detay ekranı)
+router.get('/admin/campaigns/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const { data: c, error } = await supabaseAdmin
+      .from('campaigns')
+      .select('*, type:campaign_types(id, name, slug)')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!c) {
+      res.status(404).json({ error: 'Kampanya bulunamadı.' });
+      return;
+    }
+    const { count: total } = await supabaseAdmin
+      .from('campaign_codes')
+      .select('*', { count: 'exact', head: true })
+      .eq('campaign_id', id);
+    const { count: used } = await supabaseAdmin
+      .from('campaign_codes')
+      .select('*', { count: 'exact', head: true })
+      .eq('campaign_id', id)
+      .eq('is_used', true);
+    res.json({
+      ...c,
+      totalCodes: total ?? 0,
+      usedCodes: used ?? 0,
+      remainingCodes: (total ?? 0) - (used ?? 0),
+    });
+  } catch (err) {
+    console.error('Kampanya alınamadı:', err);
+    res.status(500).json({ error: 'Kampanya alınamadı.' });
+  }
+});
+
 // PUT /api/admin/campaigns/:id — kampanya güncelle
 router.put('/admin/campaigns/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
