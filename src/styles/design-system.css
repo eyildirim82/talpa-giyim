@@ -107,8 +107,9 @@
 }
 .ds-nav__brand img { height: 34px; width: auto; flex: 0 0 auto; object-fit: contain; display: block; }
 
-/* Beyaz logo "chip"i — koyu/renkli TALPA logosunu lacivert kenar çubuğu gibi
-   koyu zeminlerde görünür kılar. */
+/* Beyaz logo "tile"ı — logoyu olduğu gibi (orijinal renk/zemin) beyaz bir
+   zemine oturtur. Koyu zeminlerde (lacivert kenar çubuğu, koyu hero kapağı)
+   her tür logoyu — şeffaf-koyu, opak-beyaz, renkli — garantili görünür kılar. */
 .ds-logo-chip {
   display: inline-flex;
   align-items: center;
@@ -116,17 +117,13 @@
   flex: 0 0 auto;
   background: #fff;
   border-radius: 8px;
-  padding: 4px 7px;
+  padding: 5px 8px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
-.ds-logo-chip img { display: block; width: auto; height: 100%; object-fit: contain; }
-
-/* Partner marka logosu — yüklenen logo açık gri, siyah ya da renkli olsun,
-   tek renk koyu siluete çevrilir; böylece beyaz kart/cam üzerinde HER zaman
-   okunur (ör. Brooks Brothers açık-gri logo beyazda kaybolmaz). */
-.ds-brandmark { filter: brightness(0); opacity: 0.88; }
-/* Koyu kapak/scrim üzerindeki partner logosu — beyaz siluet. */
-.ds-brandmark--light { filter: brightness(0) invert(1); opacity: 0.95; }
+.ds-logo-chip img { display: block; width: auto; height: 100%; max-width: 160px; object-fit: contain; }
+/* Bağlama göre tile yüksekliği */
+.ds-fhero .ds-logo-chip { height: 42px; }
+.ds-side__brand .ds-logo-chip { height: 40px; }
 .ds-nav__links { display: flex; align-items: center; gap: 0.25rem; }
 .ds-nav__link {
   display: inline-flex;
@@ -679,7 +676,6 @@
 }
 .ds-side__brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; padding: 0.4rem 0.6rem 1rem; }
 .ds-side__brand img { height: 24px; }
-.ds-side__brand .ds-logo-chip { height: 38px; }
 .ds-side__link {
   display: flex;
   align-items: center;

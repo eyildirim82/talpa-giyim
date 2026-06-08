@@ -209,7 +209,6 @@ export default function CampaignDetail() {
                 <span className="sep" />
                 {campaign.partner_logo_url ? (
                   <img
-                    className="ds-brandmark"
                     src={campaign.partner_logo_url}
                     alt={partner}
                     onError={(e) => {

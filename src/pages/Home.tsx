@@ -9,40 +9,11 @@ import FeaturedHeroDS from '../components/ds/FeaturedHeroDS';
 
 type Sort = 'default' | 'new' | 'ending';
 
-/** Backend kapalıyken hissi görebilmek için örnek veri. */
-const MOCK: Campaign[] = [
-  {
-    id: 'm1', slug: 'ornek-1', title: 'Sonbahar koleksiyonunda üyelere özel',
-    description: 'Seçili takım elbise ve gömleklerde TALPA üyelerine özel indirim. Mağaza ve online geçerli.',
-    partner_name: 'Brooks Brothers', partner_logo_url: null, cover_image_url: null,
-    discount_label: '%25 indirim', is_featured: true, featured_order: 1,
-    valid_until: '2026-12-31', starts_at: null, created_at: '2026-06-01', max_codes_per_user: 1,
-    terms: null, type: { id: 't1', name: 'İndirim Kodu', slug: 'indirim-kodu' }, has_codes: true, is_low_stock: false,
-  },
-  {
-    id: 'm2', slug: 'ornek-2', title: 'Klasik ayakkabıda özel fiyat',
-    description: 'Deri klasik modellerde geçerli üyelik avantajı.',
-    partner_name: 'Beymen', partner_logo_url: null, cover_image_url: null,
-    discount_label: '%30 indirim', is_featured: false, featured_order: 0,
-    valid_until: '2026-09-15', starts_at: null, created_at: '2026-05-20', max_codes_per_user: 1,
-    terms: null, type: { id: 't1', name: 'İndirim Kodu', slug: 'indirim-kodu' }, has_codes: true, is_low_stock: true,
-  },
-  {
-    id: 'm3', slug: 'ornek-3', title: 'Dış giyimde sezon avantajı',
-    description: 'Mont ve trençkotlarda üyelere özel kod.',
-    partner_name: 'Network', partner_logo_url: null, cover_image_url: null,
-    discount_label: '%20 indirim', is_featured: false, featured_order: 0,
-    valid_until: '2026-07-31', starts_at: null, created_at: '2026-05-10', max_codes_per_user: 1,
-    terms: null, type: { id: 't1', name: 'İndirim Kodu', slug: 'indirim-kodu' }, has_codes: true, is_low_stock: false,
-  },
-];
-
 export default function Home() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [types, setTypes] = useState<CampaignType[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [usingMock, setUsingMock] = useState(false);
 
   const [activeType, setActiveType] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -59,21 +30,14 @@ export default function Home() {
     ])
       .then(([c, t, a]) => {
         if (!alive) return;
-        const list = c as Campaign[];
-        if (list.length === 0) {
-          setCampaigns(MOCK);
-          setUsingMock(true);
-        } else {
-          setCampaigns(list);
-        }
+        setCampaigns(c as Campaign[]);
         setTypes(t as CampaignType[]);
         setAnnouncements(a as Announcement[]);
         setLoading(false);
       })
       .catch(() => {
         if (!alive) return;
-        setCampaigns(MOCK);
-        setUsingMock(true);
+        setCampaigns([]);
         setLoading(false);
       });
     return () => {
@@ -224,11 +188,6 @@ export default function Home() {
               </Link>
             </div>
 
-            {usingMock && (
-              <p style={{ marginTop: '2rem', color: 'var(--ds-ink-faint)', fontSize: '0.8rem' }}>
-                Önizleme: API kapalı (veya boş) olduğundan örnek veri gösteriliyor.
-              </p>
-            )}
           </>
         )}
       </div>

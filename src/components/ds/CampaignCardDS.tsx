@@ -48,7 +48,6 @@ export default function CampaignCardDS({
         <div className="ds-camp__brand">
           {campaign.partner_logo_url && logoOk ? (
             <img
-              className="ds-brandmark"
               src={campaign.partner_logo_url}
               alt={partner}
               loading="lazy"

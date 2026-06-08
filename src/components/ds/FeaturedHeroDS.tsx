@@ -23,13 +23,13 @@ export default function FeaturedHeroDS({ campaign }: { campaign: Campaign }) {
       <div className="ds-fhero__body">
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
           {campaign.partner_logo_url && logoOk ? (
-            <img
-              className="ds-brandmark--light"
-              src={campaign.partner_logo_url}
-              alt={partner}
-              onError={() => setLogoOk(false)}
-              style={{ height: 32, width: 'auto', maxWidth: 200, objectFit: 'contain', display: 'block' }}
-            />
+            <span className="ds-logo-chip">
+              <img
+                src={campaign.partner_logo_url}
+                alt={partner}
+                onError={() => setLogoOk(false)}
+              />
+            </span>
           ) : (
             <span style={{ fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontSize: '1rem' }}>
               {partner}
