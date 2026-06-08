@@ -3,13 +3,16 @@
 **Summary**: TALPA Kampanyaları uygulamasının üç katmanlı sistem mimarisi, kod dağıtım/talep iş akışı (claim flow) ve optimistik kilit tabanlı eşzamanlılık kontrolü.
 **Tags**: #architecture #claim-flow #concurrency #cas #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-06-07T12:00:00+03:00
+**Last Updated**: 2026-06-08T16:00:00+03:00
 
 ---
 
 ## Content
 
 Sistem, **React SPA** (Single Page Application) istemcisi, **Express** API katmanı ve **Supabase (PostgreSQL)** veri katmanından oluşan üç katmanlı bir yapıya sahiptir. Güvenlik kuralları gereği, tüm yazma ve veri güncelleme operasyonları sunucu tarafında (Express) korumalı olarak yürütülür.
+
+> [!NOTE]
+> **Vitrin & durum katmanı (2026-06):** Üye tarafı artık yalnızca **canlı** kampanyaları (aktif + arşivsiz + başlamış + süresi geçmemiş) gösterir; ayrı bir **arşiv** ucu biten/arşivlenen kampanyaları döner. Tekil kampanya ucu, istemcinin formu doğru açıp kapatması için sunucuda türetilmiş bir `status` (`live`/`scheduled`/`expired`/`sold_out`/`archived`/`inactive`) döndürür. Bu hesaplar ve stok bayrakları yalnızca **okuma** tarafıdır; aşağıdaki claim/eşzamanlılık mantığını değiştirmez. Vitrin uçları Vercel CDN'inde paylaşımlı cache'lenir; claim akışı her zaman sunucuda yeniden doğrulanır. Yönetici tarafı ise sol-menülü nested bir kabuğa taşınmıştır (bkz. [admin.md](admin.md)).
 
 ---
 
@@ -178,7 +181,7 @@ graph LR
     end
     Ping -- GET /health --> MemberAPI[TALPA Üye API]
     SC --> Codes[(campaign_codes)]
-    Panel[SystemHealth.tsx] --> Health
+    Panel[SystemHealthDS.tsx] --> Health
     Panel --> Probe
 ```
 

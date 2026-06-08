@@ -1,131 +1,135 @@
 # İstemci (Frontend) Uygulama ve Stil Rehberi
 
-**Summary**: TALPA Kampanyaları uygulamasının React 19 istemci mimarisi, yönlendirme kuralları (routing), vanilla CSS tasarım sistemi, stok rozetleri/503 UX ve istemci tarafı T.C. Kimlik doğrulama algoritması.
-**Tags**: #frontend #react #vanilla-css #routing #tc-validation #talpa
+**Summary**: React 19 istemci mimarisi, "Modern Minimal" tasarım sistemi (açık tema, mobil-öncelikli, `.ds`/`ds-*`), yönlendirme, üye sayfaları/bileşenleri, stok rozetleri, durum (status) yönetimi, 503 UX ve istemci T.C. doğrulaması.
+**Tags**: #frontend #react #design-system #routing #tc-validation #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-06-07T12:00:00+03:00
+**Last Updated**: 2026-06-08T16:00:00+03:00
 
 ---
 
 ## Content
 
-İstemci uygulaması, **React 19**, **TypeScript** ve **Vite** üzerine kurulu tek sayfalı bir uygulamadır (SPA). Bileşenlerin tasarımları, projenin modern ve premium görünümünü korumak adına TailwindCSS yerine özel yazılmış **Vanilla CSS** ile yönetilmektedir.
+İstemci, **React 19 + TypeScript + Vite** üzerine kurulu tek sayfalı bir uygulamadır (SPA). 2026-06'da arayüz **sıfırdan yeniden tasarlandı**: eski koyu (dark navy) tema yerine **Modern Minimal** — açık, "üye loncası" estetiğinde, **mobil-öncelikli** bir tasarım sistemi geldi. Tüm stiller TailwindCSS yerine özel **Vanilla CSS** ile, tek dosyada ([src/styles/design-system.css](../../src/styles/design-system.css)) `.ds` / `ds-` ön ekiyle kapsanır.
+
+> [!NOTE]
+> Eski dosyalar (`HomePage.tsx`, `CampaignPage.tsx`, `AdminDashboard.tsx`, `components/CampaignCard.tsx`, `FeaturedHero.tsx`, `SystemHealth.tsx`, `App.css`) **kaldırıldı**. Yeni yapı için bkz. [codebase-structure.md](codebase-structure.md).
 
 ---
 
 ## 🧭 Sayfa Yönlendirmeleri (Routing)
 
-Yönlendirme yönetimi `react-router-dom` kütüphanesi ile [App.tsx](../../src/App.tsx) içinde tanımlanmıştır:
+Yönlendirme `react-router-dom` ile [App.tsx](../../src/App.tsx) içinde tanımlanır:
 
-* `/` -> **[HomePage.tsx](../../src/pages/HomePage.tsx):** Aktif kampanyaların listelendiği ana sayfa. Ayrıca üyenin TCKN girip daha önce aldığı tüm kodları görebildiği **"Kodlarımı Sorgula"** aracını barındırır (`POST /api/my-codes`).
-* `/kampanya/:slug` -> **[CampaignPage.tsx](../../src/pages/CampaignPage.tsx):** Üyenin T.C. Kimlik numarasını girip indirim kodu talep ettiği tekil kampanya detay sayfası.
-* `/admin` -> **[AdminDashboard.tsx](../../src/pages/AdminDashboard.tsx):** Yetkili kullanıcıların sistem sağlığını, kampanyaları ve kod envanterini yönettiği arayüz.
+| Yol | Bileşen | Açıklama |
+| :-- | :-- | :-- |
+| `/` | [Home.tsx](../../src/pages/Home.tsx) | Vitrin: öne çıkan hero(lar), tür sekmeleri, arama/sıralama, kampanya grid'i. |
+| `/kampanya/:slug` | [CampaignDetail.tsx](../../src/pages/CampaignDetail.tsx) | Tekil kampanya + TCKN ile kod talep formu. |
+| `/kodlarim` | [MyCodes.tsx](../../src/pages/MyCodes.tsx) | "Kodlarım": TCKN ile alınan tüm kodlar (`POST /api/my-codes`). |
+| `/arsiv` | [Archive.tsx](../../src/pages/Archive.tsx) | Süresi geçmiş/arşivlenmiş kampanyalar (salt-okunur). |
+| `/admin/*` | [AdminApp.tsx](../../src/admin/AdminApp.tsx) | Yönetici paneli (nested rotalar). Bkz. [admin.md](admin.md). |
+
+> "Kodlarımı sorgula" eskiden anasayfa içindeydi; artık ayrı bir `/kodlarim` sayfasıdır. Detay sayfasından başarı sonrası "Tüm kodlarım" linki TCKN'yi `state` ile taşır ve sayfa otomatik sorgular.
 
 ---
 
-## 🎨 Tasarım Sistemi ve CSS Değişkenleri
+## 🎨 Tasarım Sistemi ve Token'lar
 
-Uygulamanın görsel estetiği [index.css](../../src/index.css) dosyasındaki koyu lacivert (dark navy) tema değişkenlerine dayanır:
+Tema, **açık zemin (slate) + TALPA navy + emerald vurgu** üzerine kuruludur. Token'lar `--ds-*` değişkenleridir ([design-system.css](../../src/styles/design-system.css)); kök sarmalayıcı `.ds` açık-tema bağlamını kurar. Tipografi: **Inter**.
 
 ```css
 :root {
-  --bg-dark: #0f172a;        /* Genel arka plan rengi */
-  --bg-card: #1e293b;        /* Kartlar ve form kutularının arka planı */
-  --text-main: #f8fafc;      /* Birincil beyaz metin rengi */
-  --text-muted: #94a3b8;     /* İkincil gri metin rengi */
-  --primary: #1a2f5c;        /* Kurumsal koyu lacivert vurgu rengi */
-  --accent: #10b981;         /* Başarı ve buton vurgu rengi (Zümrüt Yeşili) */
-  --danger: #ef4444;         /* Hata ve uyarı rengi (Kırmızı) */
-  --border-color: #334155;   /* Çerçeve ve sınır çizgisi rengi */
+  /* Zemin & yüzey */
+  --ds-bg: #f1f5f9;          /* slate-100 sayfa zemini */
+  --ds-surface: #ffffff;     /* kartlar, paneller */
+  --ds-sunken: #f1f5f9;      /* input / iç kuyular */
+  /* Kenarlık & metin */
+  --ds-border: #e2e8f0;
+  --ds-ink: #0f172a;         /* slate-900 ana metin */
+  --ds-ink-soft: #475569;
+  --ds-ink-faint: #64748b;
+  /* Birincil aksiyon — TALPA navy */
+  --ds-primary: #1a2f5c;
+  /* Vurgu — emerald (kod, başarı, claim CTA) */
+  --ds-accent: #059669;
+  /* Semantik */
+  --ds-success: #059669; --ds-danger: #dc2626; --ds-warning: #d97706; --ds-info: #2563eb;
+  /* Yarıçap / gölge / odak halkası ... (bkz. dosya) */
 }
 ```
 
-### Görsel Tasarım Kuralları:
-* **Glassmorphism:** Kampanya detay sayfasındaki kartlar `backdrop-filter: blur(14px)` ve yarı şeffaf arka plan rengi (`rgba(30, 41, 59, 0.88)`) ile yarı saydam bir cam etkisi kazanmıştır.
-* **Micro-Animations:** Formların yüklenme durumlarında `lucide-react` paketinden `Loader2` ikonu `@keyframes spin` animasyonuyla döner. Kampanya kartları üzerinde hafif bir hover animasyonu mecesuttur.
+### Görsel kurallar
+* **Tek vurgu disiplini:** Birincil aksiyon **navy**, "kod al/başarı" vurgusu **emerald**. Rozetlerde vurgu (mavi/emerald) ile semantik renkler (kırmızı/sarı) ayrı tutulur.
+* **Görselsiz kampanyalar:** Kapak görseli yoksa `lib/cover.ts`'teki `coverTone(slug)` ile **deterministik gradient** seçilir (`ds-cover-ph--{bb|navy|warm|slate|green}`) ve marka adı watermark olarak yazılır.
+* **Cam (glass) detay:** Kampanya detayında içerik, kapak üzerinde `ds-glass` panelde durur.
+* **Mikro-animasyon:** `lucide-react` `Loader2` + `ds-spin`; kartlarda hover; kopyalamada `ds-toast`.
+* **Mobil-öncelikli:** `ds-grid` ve toolbar küçük ekrandan büyür; admin kenar çubuğu daralır.
 
 ---
 
-## 🧩 Çekirdek Bileşenler (Core Components)
+## 🧩 Üye Tarafı Bileşenleri (`components/ds/`)
 
-### 1. `FeaturedHero.tsx`
-* **Görevi:** Yayındaki kampanyalar arasında `is_featured = true` olan ve en yüksek `featured_order` değerine sahip olan kampanyayı ana sayfanın en üstünde büyük bir görsel ve vurgulu bir şekilde sergiler.
-* **Tasarım:** Geniş kapak görseli, gölgeli degrade geçişi ve doğrudan kampanya detayına yönlendiren "Kampanyayı İncele" butonu barındırır.
-
-### 2. `CampaignCard.tsx`
-* **Görevi:** Ana sayfada öne çıkan haricindeki diğer tüm aktif kampanyaları 2'li veya 3'lü grid düzeninde listelemek için kullanılan kart bileşenidir.
-* **Özellikler:** Kampanya başlığı, partner logo görseli, indirim oranı etiketi ve son katılım tarihini içerir. Stok durumuna göre **"Tükendi"** (`has_codes === false`, buton kilitli) veya **"Son kodlar!"** (`is_low_stock`) rozeti gösterir.
-
-### 3. `SystemHealth.tsx`
-* **Görevi:** Yönetici panelinin en üstünde yer alan **Sistem Sağlığı** kartı; dış servis durumu, sistem nabzı ve stok durumunu canlı izler. Yalnızca admin tarafından görülür.
-* **Çalışma:** `/api/admin/health` (25 sn) ve `/api/admin/health/probe` (60 sn) uç noktalarını periyodik yoklar; sekme gizliyken durur. Detaylı kullanım için bkz. [admin.md](admin.md#-sistem-sa%C4%9Fl%C4%B1%C4%9F%C4%B1-paneli).
-* **Props:** `getAuthHeaders: () => Promise<Record<string,string>>` — her çağrıda canlı Supabase oturum token'ını okur.
+| Bileşen | Görevi |
+| :-- | :-- |
+| [DsNav.tsx](../../src/components/ds/DsNav.tsx) | Sticky cam üst bar; TALPA logosu + **Arşiv** / **Kodlarım** linkleri. |
+| [AnnouncementBar.tsx](../../src/components/ds/AnnouncementBar.tsx) | Aktif duyuruları tek satır şeritte 6 sn'de bir döndürür (hover'da durur, nokta navigasyonu). İç kampanya linki `/kampanya/:slug`, dış link yeni sekme. |
+| [CampaignCardDS.tsx](../../src/components/ds/CampaignCardDS.tsx) | Grid kartı. `Tükendi`/`Son fırsat`/`Sona erdi` rozetleri; `ended` ise tıklanamaz. |
+| [FeaturedHeroDS.tsx](../../src/components/ds/FeaturedHeroDS.tsx) | Öne çıkan kampanya hero'su (koyu kapak + scrim + "ÖNE ÇIKAN" rozeti + emerald CTA). |
+| [Badge.tsx](../../src/components/ds/Badge.tsx) | Küçük rozet — `accent`/`danger`/`warning`/`neutral`/`info`. |
+| [Button.tsx](../../src/components/ds/Button.tsx) | Buton — `primary`/`accent`/`ghost`, `block`. |
 
 ---
 
-## 📉 Stok Durumu Rozetleri (Sold-out / Low-stock)
+## 🧾 Kampanya Durumu (`status`) ve UI Davranışı
 
-`/api/campaigns` her kampanyayla birlikte sunucuda türetilen `has_codes` ve `is_low_stock` bayraklarını döndürür (ham kod sayıları istemciye sızmaz). UI bu bayraklara göre davranır — [FeaturedHero.tsx](../../src/components/FeaturedHero.tsx), [CampaignCard.tsx](../../src/components/CampaignCard.tsx) ve [CampaignPage.tsx](../../src/pages/CampaignPage.tsx):
+Tekil kampanya ucu (`/api/campaigns/:slug`) sunucu tarafında türetilmiş bir `status` döndürür ([lib/types.ts](../../src/lib/types.ts) `CampaignStatus`). [CampaignDetail.tsx](../../src/pages/CampaignDetail.tsx) buna göre davranır:
 
-* `has_codes === false` → **"Tükendi"** rozeti; "Kodu Al" butonu pasif/kilitli.
-* `is_low_stock === true` (ve stok var) → **"Son kodlar!"** uyarısı; buton aktif kalır.
-* İki bayrak da yoksa normal akış. Eşik backend ile birebir aynıdır: `max(ceil(total*0.15), 25)`.
+* `archived` / `inactive` → kullanıcı anasayfaya yönlendirilir (vitrinde olmamalı).
+* `scheduled` → "Bu kampanya yakında başlayacak", form **kapalı**.
+* `expired` → "Bu kampanya sona erdi", form **kapalı**.
+* `sold_out` (veya `has_codes === false`) → "Dağıtılacak kod kalmamıştır", buton **kilitli** ("Tükendi").
+* `is_low_stock` → "Sınırlı sayıda kod kaldı" uyarısı; buton aktif.
+* `live` → normal kod alma akışı.
+
+Grid/hero kartlarında ise `/api/campaigns` ve `/api/campaigns/archive`'in döndürdüğü `has_codes` / `is_low_stock` (ve arşivde `ended`) bayrakları kullanılır. Eşik backend ile birebir: `max(ceil(total*0.15), 25)`.
 
 ---
 
 ## 🔌 Servis Ulaşılamıyor (503) Deneyimi
 
-Üye doğrulama servisi geçici olarak çökerse backend `degil` yerine **503** döner (bkz. [member-verification.md](member-verification.md)). İstemci bu durumu özel olarak ele alır: kullanıcıyı "üye değil" diye **kırmızı reddetmek yerine**, nötr bir bilgi kutusu ve **"Tekrar Dene"** butonu gösterir.
-
-* **[CampaignPage.tsx](../../src/pages/CampaignPage.tsx)** (kod alma): `res.status === 503` → "Doğrulama servisine şu an ulaşılamıyor… birkaç dakika sonra tekrar deneyin." + `RefreshCw` ikonlu Tekrar Dene.
-* **[HomePage.tsx](../../src/pages/HomePage.tsx)** (Kodlarımı Sorgula): aynı 503 mantığı; "Deneniyor…" / "Tekrar Dene".
+Doğrulama servisi geçici çökerse backend `degil` yerine **503** döner. İstemci kullanıcıyı "üye değil" diye **kırmızı reddetmez**; nötr bilgi kutusu + **"Tekrar Dene"** gösterir:
+* [CampaignDetail.tsx](../../src/pages/CampaignDetail.tsx) (kod alma) ve [MyCodes.tsx](../../src/pages/MyCodes.tsx) (sorgu): `res.status === 503` → "birkaç dakika sonra tekrar deneyin" + `RefreshCw` ile yeniden dene.
 
 ---
 
-## 🔒 T.C. Kimlik Numarası Doğrulama Algoritması
+## 🔒 T.C. Kimlik Numarası Doğrulaması (`lib/tc.ts`)
 
-Kampanya sayfasında istek sunucuya gönderilmeden önce frontend tarafında tarayıcı yükünü azaltmak amacıyla T.C. Kimlik Numarası biçimsel algoritma kontrolünden geçirilir:
+İstek sunucuya gitmeden önce istemcide biçim/algoritma kontrolü yapılır ([src/lib/tc.ts](../../src/lib/tc.ts) — `isValidTC`). Sunucu (`server/lib/validateTc.ts`) yine bağımsız doğrular.
 
 ```typescript
-function isValidTC(tc: string): boolean {
-  // 1. Kural: 11 haneli olmalı, tamamen rakamlardan oluşmalı ve ilk hanesi 0 olmamalıdır.
+export function isValidTC(tc: string): boolean {
   if (tc.length !== 11 || !/^\d+$/.test(tc) || tc[0] === '0') return false;
-  
   const d = tc.split('').map(Number);
-  
-  // 2. Kural: 1, 3, 5, 7 ve 9. hanelerin toplamının 7 katından;
-  // 2, 4, 6 ve 8. hanelerin toplamı çıkarıldığında elde edilen sonucun 10'a bölümünden kalan (mod 10),
-  // bize 10. haneyi vermelidir.
   const oddSum = d[0] + d[2] + d[4] + d[6] + d[8];
   const evenSum = d[1] + d[3] + d[5] + d[7];
   if ((oddSum * 7 - evenSum) % 10 !== d[9]) return false;
-  
-  // 3. Kural: İlk 10 hanenin toplamının 10'a bölümünden kalan (mod 10),
-  // bize 11. haneyi vermelidir.
   const total = d.slice(0, 10).reduce((a, b) => a + b, 0);
   return total % 10 === d[10];
 }
 ```
-* **Kullanıcı Deneyimi:** T.C. Kimlik hanesi girişi esnasında sayısal olmayan tüm girdiler regex (`/\D/g`) ile temizlenir ve en fazla 11 karakter yazılmasına izin verilir. Hatalı biçim tespit edilirse arayüzde Türkçe hata bildirimi gösterilir.
+* **UX:** Girişte sayısal olmayan karakterler (`/\D/g`) temizlenir, en fazla 11 hane; 11 hanede yeşil/kırmızı kenarlık ve ikon (geçerli/geçersiz) gösterilir.
 
 ---
 
 ## 🖼️ İstemci Tarafı Görsel Sıkıştırma (`imageCompress.ts`)
 
-Yöneticinin yüklediği logo/kapak görselleri Supabase Storage'a gönderilmeden **tarayıcıda** yeniden boyutlandırılıp sıkıştırılır ([src/lib/imageCompress.ts](../../src/lib/imageCompress.ts)). Böylece `campaign-images` bucket'ının 5 MB limiti aşılmaz ve üye sayfaları daha hızlı yüklenir.
+Yöneticinin yüklediği logo/kapak görselleri Storage'a gönderilmeden **tarayıcıda** yeniden boyutlandırılıp sıkıştırılır ([src/lib/imageCompress.ts](../../src/lib/imageCompress.ts)). `compressImage(file)` en uzun kenarı ~1600 px'e ölçekler, hedef üst boyut ~4.5 MB; PNG/WebP saydamlığını korumaya çalışır, sığmazsa beyaz arka planlı JPEG'e düşer; SVG/GIF dokunulmaz. Çıktı, signed upload URL ile doğrudan Storage'a yüklenir (bkz. [admin.md](admin.md#görsel-yükleme-logo--kapak)).
 
-```typescript
-const optimized = await compressImage(file); // varsayılan: 1600px, q=0.82, ≤4.5MB
-```
-
-* `createImageBitmap` ile (yoksa `<img>`'e düşerek) çözer, canvas'a yeniden çizer.
-* En uzun kenarı **1600 px**'e ölçekler; hedef üst boyut **~4.5 MB** (limitin altında pay).
-* PNG/WebP **saydamlığını korumayı** dener; sığmazsa beyaz arka planlı **JPEG**'e düşer ve kalite 0.4'e kadar kademeli azaltılır.
-* **SVG/GIF** dokunulmadan bırakılır (vektör/animasyon bozulmasın). Küçültmeye gerek yoksa orijinal dosya olduğu gibi döner.
-
-Sıkıştırılmış dosya ardından signed upload URL ile doğrudan Storage'a yüklenir (bkz. [admin.md](admin.md#3-g%C3%B6rsel-y%C3%BCkleme-logo--kapak)).
+> [!NOTE]
+> Veri okuma için `lib/supabase.ts` istemcisi **kullanılmaz**; o yalnızca admin auth (`signInWithPassword`, oturum/token) ve `uploadToSignedUrl` içindir. Tüm kampanya/kod verisi Express `/api` üzerinden gelir.
 
 ## Related Notes
 
 - [[README]]
 - [[admin]]
+- [[codebase-structure]]
+- [[api]]

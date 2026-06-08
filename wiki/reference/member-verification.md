@@ -3,7 +3,7 @@
 **Summary**: TALPA Kampanyaları uygulamasının dış TALPA Üye API entegrasyonu, HTTP request/response şeması, iş mantığı durum tablosu ve rate-limiting/sunucu hataları için üstel geri çekilme (retry) politikası.
 **Tags**: #member-verification #api #integration #retry-policy #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-06-07T12:00:00+03:00
+**Last Updated**: 2026-06-08T16:00:00+03:00
 
 ---
 

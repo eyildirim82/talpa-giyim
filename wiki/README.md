@@ -3,13 +3,16 @@
 **Summary**: TALPA Kampanyaları uygulamasının geliştirici wiki ana sayfası, sistem dizin yapısı, yerel kurulum kılavuzu ve LLM Wiki kullanım rehberi.
 **Tags**: #wiki #index #documentation #setup #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-06-07T12:00:00+03:00
+**Last Updated**: 2026-06-08T16:00:00+03:00
 
 ---
 
 ## Content
 
 TALPA (Türkiye Havayolu Pilotları Derneği) üyelerine özel anlaşmalı firmalardan alınan indirim kodlarını yöneten ve dağıtan full-stack web uygulamasıdır. Bu wiki, sistemin mimarisini, veri modelini, API uç noktalarını ve iş kurallarını belgelemek amacıyla oluşturulmuştur.
+
+> [!NOTE]
+> **Güncel durum (2026-06):** Üye arayüzü "**Modern Minimal**" (açık tema, mobil-öncelikli) olarak yeniden tasarlandı; anasayfa tür sekmeleri/arama, ayrı **Kodlarım** ve **Arşiv** sayfaları eklendi. Yönetici paneli sol-menülü nested bir kabuğa dönüştü ve **Türler**, **Duyurular**, kampanya **klon/arşiv/sil** ve aranabilir **kod havuzu** yetenekleri kazandı. Veri modeline `campaign_types` ve `announcements` tabloları ile `campaigns` üzerine `type_id`, `starts_at`, `is_archived` alanları eklendi.
 
 ---
 
@@ -76,7 +79,12 @@ Projeyi yerelde ve canlı ortamda çalıştırmak için aşağıdaki ortam deği
 SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_SERVICE_KEY=eyJ...          # service_role key (sadece sunucu tarafında kullanılır)
 VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...       # anon key (frontend tarafında okuma amaçlı kullanılır)
+VITE_SUPABASE_ANON_KEY=eyJ...       # anon key (frontend: yalnızca auth + signed upload)
+
+# Opsiyonel: Admin JWT'lerini her istekte Supabase Auth'a gitmeden YEREL doğrulamak için.
+# Supabase paneli → Settings → API → "JWT Secret" (legacy/HS256). Tanımlanmazsa sistem
+# güvenli şekilde getUser() ağ doğrulamasına geri döner (eski davranış, hiçbir şey kırılmaz).
+SUPABASE_JWT_SECRET=
 
 # TALPA Üye Doğrulama Servisi
 TALPA_MEMBER_API_URL=https://talpa-uye.vercel.app/api/members/verify

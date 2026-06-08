@@ -1,150 +1,112 @@
 # API Uç Noktaları (Endpoints) Dokümantasyonu
 
-**Summary**: TALPA Kampanyaları uygulamasının API uç noktaları dokümantasyonu; üye uç noktaları (public) ve korunan yönetici (admin) uç noktalarını içerir.
+**Summary**: TALPA Kampanyaları uygulamasının API uç noktaları; public vitrin uçları (kampanya/arşiv/tür/duyuru), üye kod uçları ve korunan yönetici (admin) uçları (kampanya/kod/tür/duyuru CRUD, sağlık, export).
 **Tags**: #api #endpoints #routing #talpa
 **Created**: 2026-05-26T12:35:00+03:00
-**Last Updated**: 2026-06-07T12:00:00+03:00
+**Last Updated**: 2026-06-08T16:00:00+03:00
 
 ---
 
 ## Content
 
-API sunucusu, `/api` önekiyle hizmet verir. Üye uç noktaları halka açıkken, yönetici (admin) uç noktaları yetkilendirme katmanıyla korunmaktadır.
+API sunucusu `/api` önekiyle hizmet verir. Vitrin (public) uçları halka açıkken, yönetici uçları yetkilendirme katmanıyla korunur. Public vitrin uçları, herkese aynı veriyi döndürdüğü için Vercel CDN'inde paylaşımlı olarak cache'lenir (`Cache-Control: public, s-maxage=…`).
 
 ---
 
-## 👥 Üye Uç Noktaları (Public API)
+## 🌐 Vitrin Uç Noktaları (Public)
 
-> [!NOTE]
-> `/api/claim-code` ve `/api/my-codes` uç noktaları **IP başına dakikada 10 istekle** sınırlıdır; aşıldığında **429** döner. Ayrıca `tc_no` sunucu tarafında algoritmik olarak doğrulanır; geçersizse **400 "Geçersiz T.C. Kimlik Numarası."** döner.
+### 1. Aktif (Canlı) Kampanyaları Getir
+Vitrinde gösterilen **canlı** kampanyaları döner: `is_active = true` **ve** `is_archived = false` **ve** (`starts_at` boş ya da geçmiş) **ve** (`valid_until` boş ya da bugünden büyük/eşit). `featured_order` azalan sırada. Stok tek RPC (`campaign_stock_counts()`) ile alınır.
 
-> [!IMPORTANT]
-> **503 — Doğrulama servisi geçici hata:** Üye doğrulama servisine ulaşılamazsa (`verifyMember` → `hata`) hem `/api/claim-code` hem de `/api/my-codes` **503** döner: `{ "error": "Üyelik doğrulama servisine şu an ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyin." }`. Bu durumda gerçek üye `degil` ile reddedilmez; olay `system_verify_failures` tablosuna kaydedilir. Bkz. [member-verification.md](member-verification.md#-yan%C4%B1t-durumlar%C4%B1-ve-i%C5%9F-mant%C4%B1%C4%9F%C4%B1-business-logic).
-
-### 1. Aktif Kampanyaları Getir
-Aktif yayında olan (`is_active = true`) tüm kampanyaları `featured_order` azalan sırada listeler. Her kampanya için stok bilgisi **tek bir RPC** (`campaign_stock_counts()`) ile toplanır; eski sürümdeki kampanya başına ayrı sayım sorgusu (N+1) kaldırılmıştır — toplu e-posta anında her ziyaretçi için yüzlerce sorgu atılmasını önler.
-
-* **URL:** `/api/campaigns`
-* **Metot:** `GET`
-* **Yetkilendirme:** Yok
-* **cURL Test Komutu:**
-  ```bash
-  curl -X GET http://localhost:3001/api/campaigns
-  ```
+* **URL:** `/api/campaigns` · **Metot:** `GET` · **Yetki:** Yok
+* **Cache:** `public, s-maxage=60, stale-while-revalidate=300`
 * **Başarılı Yanıt (200 OK):**
   ```json
   [
     {
-      "id": "7fbe5012-e544-4822-a9b0-31db72b64d0b",
+      "id": "7fbe5012-…",
       "slug": "brooks-brothers-2026",
       "title": "Brooks Brothers Kampanyası",
-      "description": "Tüm Brooks Brothers mağazalarında geçerli ek %10 indirim.",
+      "description": "…",
       "partner_name": "Brooks Brothers",
-      "partner_logo_url": "https://xxxx.supabase.co/storage/v1/object/public/campaign-images/logo.png",
-      "cover_image_url": "https://xxxx.supabase.co/storage/v1/object/public/campaign-images/cover.jpg",
+      "partner_logo_url": "https://…/logo.png",
+      "cover_image_url": "https://…/cover.jpg",
       "discount_label": "%10 İndirim",
       "is_featured": true,
       "featured_order": 5,
       "valid_until": "2026-12-31",
+      "starts_at": null,
+      "created_at": "2026-05-01T08:00:00Z",
       "max_codes_per_user": 1,
-      "terms": "Kampanya koşulları buraya yazılır...",
+      "terms": "…",
+      "type": { "id": "…", "name": "Giyim", "slug": "giyim" },
       "has_codes": true,
       "is_low_stock": false
     }
   ]
   ```
-  > **`has_codes` / `is_low_stock`:** Stok durumu sunucuda türetilir; ham kod sayıları **istemciye sızdırılmaz**. `has_codes = false` → stok tükendi ("Tükendi" rozeti, buton kilitli). `is_low_stock = true` → kalan kod eşiğin altında ("Son kodlar!" uyarısı). Eşik admin sağlık ekranıyla **aynıdır**: `max(ceil(total * 0.15), 25)` — yani kalanın %15'i, küçük kampanyalarda en az 25 adet.
+  > **`type`:** Kampanyanın türü (gömülü; vitrin sekmelerinde/filtrede kullanılır). **`has_codes` / `is_low_stock`:** Stok sunucuda türetilir; ham kod sayıları **istemciye sızdırılmaz**. `has_codes = false` → "Tükendi". `is_low_stock = true` → "Son fırsat". Eşik admin sağlık ekranıyla aynı: `max(ceil(total * 0.15), 25)`.
 
 ---
 
-### 2. İndirim Kodu Talep Et (Claim)
-TC Kimlik Numarası doğrulaması yaparak üyeye yeni indirim kodu tahsis eder.
+### 2. Arşiv Kampanyaları
+Biten veya arşivlenen kampanyalar (salt-okunur): `is_archived = true` **veya** `valid_until < bugün`. `valid_until` azalan sırada.
 
-* **URL:** `/api/claim-code`
-* **Metot:** `POST`
-* **Yetkilendirme:** Yok
-* **cURL Test Komutu:**
-  ```bash
-  curl -X POST http://localhost:3001/api/claim-code \
-    -H "Content-Type: application/json" \
-    -d '{"tc_no": "12345678901", "campaign_slug": "brooks-brothers-2026"}'
-  ```
-* **İstek Gövdesi (Request Body):**
-  ```json
-  {
-    "tc_no": "12345678901",
-    "campaign_slug": "brooks-brothers-2026"
-  }
-  ```
+* **URL:** `/api/campaigns/archive` · **Metot:** `GET` · **Yetki:** Yok
+* **Cache:** `public, s-maxage=300, stale-while-revalidate=600`
+* Yanıt biçimi `/api/campaigns` ile aynıdır.
+
+---
+
+### 3. Kampanya Türleri
+Vitrin sekmeleri ve admin formları için tür listesi (`sort_order` artan).
+
+* **URL:** `/api/campaign-types` · **Metot:** `GET` · **Yetki:** Yok
+* **Yanıt:** `[{ "id": "…", "name": "Giyim", "slug": "giyim", "sort_order": 0 }]`
+
+---
+
+### 4. Aktif Duyurular
+Anasayfa duyuru şeridini besler (`is_active = true`, `sort_order` artan). Bir duyuru kampanyaya bağlıysa o kampanyanın `slug`'ı `link_slug` olarak döner.
+
+* **URL:** `/api/announcements` · **Metot:** `GET` · **Yetki:** Yok
+* **Yanıt:** `[{ "id": "…", "message": "…", "link_url": null, "link_slug": "brooks-brothers-2026", "sort_order": 0 }]`
+
+---
+
+### 5. Tekil Kampanya (Detay)
+Detay ekranı için tek kampanya + **türetilmiş durum**. `/campaigns/archive`'dan sonra tanımlıdır (rota eşleşmesi).
+
+* **URL:** `/api/campaigns/:slug` · **Metot:** `GET` · **Yetki:** Yok
+* **Cache:** `public, s-maxage=30, stale-while-revalidate=120`
+* **Ek alan `status`:** `archived` · `inactive` · `scheduled` (başlangıç gelecekte) · `expired` (bitiş geçti) · `sold_out` (kod kalmadı) · `live`. Ayrıca `has_codes` / `is_low_stock` döner.
+* **404:** Kampanya bulunamazsa `{ "error": "Kampanya bulunamadı." }`.
+
+---
+
+## 👥 Üye Kod Uç Noktaları (Public)
+
+> [!NOTE]
+> `/api/claim-code` ve `/api/my-codes` **IP başına dakikada 10 istekle** sınırlıdır; aşıldığında **429** döner. `tc_no` sunucuda algoritmik doğrulanır; geçersizse **400 "Geçersiz T.C. Kimlik Numarası."**.
+
+> [!IMPORTANT]
+> **503 — Doğrulama servisi geçici hata:** Üye doğrulama servisine ulaşılamazsa (`verifyMember → hata`) hem `/api/claim-code` hem `/api/my-codes` **503** döner: `{ "error": "Üyelik doğrulama servisine şu an ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyin." }`. Gerçek üye `degil` ile reddedilmez; olay `system_verify_failures`'a kaydedilir. Bkz. [member-verification.md](member-verification.md).
+
+### 6. İndirim Kodu Talep Et (Claim)
+* **URL:** `/api/claim-code` · **Metot:** `POST` · **Yetki:** Yok
+* **İstek Gövdesi:** `{ "tc_no": "12345678901", "campaign_slug": "brooks-brothers-2026" }`
 * **Başarılı Yanıtlar (200 OK):**
-  
-  * **Senaryo A: Yeni Kod Başarıyla Teslim Edildi (Limit Dolmadı):**
-    ```json
-    {
-      "alreadyClaimed": false,
-      "limitReached": false,
-      "code": "BB-10-XYZ123",
-      "message": "Kampanya kodunuz başarıyla teslim edildi."
-    }
-    ```
-  * **Senaryo B: Yeni Kod Teslim Edildi ve Kullanıcı Limitine Ulaşıldı:**
-    ```json
-    {
-      "alreadyClaimed": false,
-      "limitReached": true,
-      "codes": ["BB-10-XYZ123"],
-      "message": "Kampanya kodunuz teslim edildi."
-    }
-    ```
-  * **Senaryo C: Kullanıcı Zaten Önceden Kod Almış (Yeni Kod Üretilmedi):**
-    ```json
-    {
-      "alreadyClaimed": true,
-      "codes": ["BB-10-XYZ123"],
-      "message": "Bu kampanyadan daha önce kod aldınız."
-    }
-    ```
-
-* **Hata Yanıtları:**
-  * **400 Bad Request:** Eksik parametre veya geçersiz kampanya.
-    ```json
-    { "error": "Bu kampanya şu an aktif değildir." }
-    ```
-  * **403 Forbidden (Aidat Borcu):**
-    ```json
-    { "error": "Dernek aidat borçlarınız sebebiyle kampanya katılımınız sınırlandırılmıştır. Lütfen muhasebe birimi ile iletişime geçiniz." }
-    ```
-  * **403 Forbidden (Üye Değil):**
-    ```json
-    { "error": "TALPA üyelik kaydınıza ulaşılamamıştır." }
-    ```
-  * **404 Not Found (Kod Yok):**
-    ```json
-    { "error": "Bu kampanyada dağıtılacak kod kalmamıştır." }
-    ```
-  * **409 Conflict:** Çakışma yaşanırsa.
-    ```json
-    { "error": "Kod alınırken çakışma oluştu, lütfen tekrar deneyin." }
-    ```
-  * **503 Service Unavailable:** Üye doğrulama servisine ulaşılamadı (geçici).
-    ```json
-    { "error": "Üyelik doğrulama servisine şu an ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyin." }
-    ```
+  * **A — Yeni kod (limit dolmadı):** `{ "alreadyClaimed": false, "limitReached": false, "code": "BB-10-XYZ123", "message": "Kampanya kodunuz başarıyla teslim edildi." }`
+  * **B — Yeni kod + limit doldu:** `{ "alreadyClaimed": false, "limitReached": true, "codes": ["BB-10-XYZ123"], "message": "Kampanya kodunuz teslim edildi." }`
+  * **C — Daha önce almış:** `{ "alreadyClaimed": true, "codes": ["BB-10-XYZ123"], "message": "Bu kampanyadan daha önce kod aldınız." }`
+* **Hata Yanıtları:** `400` (eksik parametre / pasif / süresi geçmiş kampanya / geçersiz TC) · `403` (`borclu` / `degil`) · `404` (kod kalmadı veya kampanya yok) · `503` (doğrulama servisine ulaşılamadı) · `500` (sistem hatası).
 
 ---
 
-### 3. Üyenin Tüm Kodlarını Getir (My Codes)
-TC Kimlik doğrulaması yaparak, üyenin tüm kampanyalarda daha önce aldığı kodları kampanya bilgileriyle birlikte döner. Üye kendi kod geçmişini görüntülemek için kullanır.
+### 7. Üyenin Tüm Kodları (My Codes)
+Üyenin tüm kampanyalarda aldığı kodları kampanya bilgisiyle döner.
 
-* **URL:** `/api/my-codes`
-* **Metot:** `POST`
-* **Yetkilendirme:** Yok (üyelik `verifyMember` ile doğrulanır)
-* **cURL Test Komutu:**
-  ```bash
-  curl -X POST http://localhost:3001/api/my-codes \
-    -H "Content-Type: application/json" \
-    -d '{"tc_no": "12345678901"}'
-  ```
+* **URL:** `/api/my-codes` · **Metot:** `POST` · **Yetki:** Yok (`verifyMember` ile doğrulanır)
 * **İstek Gövdesi:** `{ "tc_no": "12345678901" }`
 * **Başarılı Yanıt (200 OK):**
   ```json
@@ -153,241 +115,102 @@ TC Kimlik doğrulaması yaparak, üyenin tüm kampanyalarda daha önce aldığı
       "code": "BB-10-XYZ123",
       "claimed_at": "2026-05-26T10:00:00Z",
       "campaign": {
-        "id": "7fbe5012-e544-4822-a9b0-31db72b64d0b",
-        "slug": "brooks-brothers-2026",
-        "title": "Brooks Brothers Kampanyası",
-        "discount_label": "%10 İndirim",
-        "partner_name": "Brooks Brothers",
-        "partner_logo_url": "https://xxxx.supabase.co/.../logo.png"
+        "id": "7fbe5012-…", "slug": "brooks-brothers-2026",
+        "title": "Brooks Brothers Kampanyası", "discount_label": "%10 İndirim",
+        "partner_name": "Brooks Brothers", "partner_logo_url": "https://…/logo.png"
       }
     }
   ]
   ```
-* **Hata Yanıtları:** `400` (tc_no eksik/geçersiz), `403` (borçlu / üye değil), `503` (doğrulama servisine ulaşılamadı — tekrar denenebilir), `500` (sistem hatası).
+* **Hata Yanıtları:** `400` · `403` · `503` · `500`.
 
 ---
 
 ## 🛠️ Yönetici Uç Noktaları (Admin API)
 
-Tüm yönetici API'leri HTTP `Authorization` başlığında geçerli bir JWT token bekler ve token sahibinin e-postası `admins` allowlist tablosunda kayıtlı olmalıdır (bkz. [admin.md](admin.md)).
+Tüm admin uçları `Authorization: Bearer <supabase_access_token>` bekler; token sahibinin e-postası `admins` allowlist tablosunda olmalıdır (bkz. [admin.md](admin.md)). Doğrulama önce **yerel HS256** (`SUPABASE_JWT_SECRET`), olmazsa `auth.getUser()` ile yapılır.
 
-* **Header:** `Authorization: Bearer <supabase_access_token>`
-* **401 Unauthorized:** Token yok veya geçersiz.
-* **403 Forbidden:** Token geçerli ancak kullanıcı `admins` tablosunda değil (`{ "error": "Bu hesabın yönetici yetkisi bulunmuyor." }`).
+* **401:** Token yok/geçersiz. · **403:** Geçerli kullanıcı ama admin değil (`{ "error": "Bu hesabın yönetici yetkisi bulunmuyor." }`).
+
+### Kampanyalar
+| # | Metot & URL | Açıklama |
+| :- | :--- | :--- |
+| 1 | `GET /api/admin/campaigns` | Tüm kampanyalar (tür gömülü) + `totalCodes`/`usedCodes`/`remainingCodes`. `created_at` azalan. |
+| 2 | `GET /api/admin/campaigns/:id` | Tekil kampanya + kod istatistikleri (detay ekranı). |
+| 3 | `POST /api/admin/campaigns` | Yeni kampanya (`slug`, `title`, `discount_label` zorunlu). `type_id` verilmezse varsayılan türe (en düşük `sort_order`) düşer. **201**. |
+| 4 | `PUT /api/admin/campaigns/:id` | Kampanya güncelle (gövdedeki alanlar). |
+| 5 | `POST /api/admin/campaigns/:id/clone` | Kampanyayı **kodlar/talepler hariç** kopyalar (`-kopya-…` slug, pasif/arşivsiz). **201**. |
+| 6 | `DELETE /api/admin/campaigns/:id` | Kampanyayı **kalıcı** siler (kodlar/talepler cascade). |
+
+### Kod Yönetimi
+| # | Metot & URL | Açıklama |
+| :- | :--- | :--- |
+| 7 | `POST /api/admin/campaigns/:id/codes` | **Toplu** kod yükle. `{ "codes": [...] }`. Kodlar **TÜM kampanyalarda benzersiz** olduğundan `ON CONFLICT (code) DO NOTHING` ile çakışanlar atlanır. Yanıt: `{ "success": true, "inserted": 2, "duplicates": ["CODE1"] }`. |
+| 8 | `GET /api/admin/campaigns/:id/codes?search=&page=&pageSize=` | Kod havuzu (arama + sayfalama; `pageSize` ≤ 100). Yanıt: `{ "codes": [...], "total": N, "page", "pageSize" }`. |
+| 9 | `POST /api/admin/campaigns/:id/codes/one` | Tek kod ekle. **201** / **409** (kod zaten var). |
+| 10 | `PUT /api/admin/codes/:codeId` | Kod değerini düzelt — **yalnız dağıtılmamış**. **409** dağıtılmışsa/çakışmada. |
+| 11 | `DELETE /api/admin/codes/:codeId` | Tek kod sil — **yalnız dağıtılmamış**. **409** dağıtılmış/bulunamadı. |
+| 12 | `POST /api/admin/codes/bulk-delete` | `{ "ids": [...] }` — dağıtılmamış olanları siler (kullanılmışlar atlanır). Yanıt: `{ "success": true, "deleted": N }`. |
+| 13 | `GET /api/admin/campaigns/:id/lookup?tc_no=…` | Üyenin bu kampanyadan aldığı kodlar. `{ "found": false }` veya `{ "found": true, "tc_no", "codes": [{ "code", "claimed_at" }] }`. |
+| 14 | `GET /api/admin/campaigns/:id/preview` | Son 20 kod + son 20 claim (canlı önizleme). |
+| 15 | `GET /api/admin/campaigns/:id/export` | Tüm kodları **CSV** indirir (UTF-8 BOM, Excel uyumlu, formül-enjeksiyonu korumalı). `Content-Disposition: attachment; filename="<slug>-kod-raporu.csv"`. Sütunlar: `İndirim Kodu, Kullanım Durumu, Kullanan T.C. No, Kullanım Tarihi`. |
+
+### Türler (Campaign Types)
+| # | Metot & URL | Açıklama |
+| :- | :--- | :--- |
+| 16 | `GET /api/admin/campaign-types` | Tür listesi (`sort_order` artan). |
+| 17 | `POST /api/admin/campaign-types` | Tür oluştur (`name` zorunlu; `slug` verilmezse Türkçe-uyumlu slugify; `sort_order` verilmezse sona eklenir). **201** / **409** (slug çakışması). |
+| 18 | `PUT /api/admin/campaign-types/:id` | Tür güncelle (`name`/`slug`/`sort_order`). **409** slug çakışması. |
+| 19 | `DELETE /api/admin/campaign-types/:id` | Tür sil. **409** ("kullanımda" — FK ihlali; önce kampanyaları taşıyın). |
+
+### Duyurular (Announcements)
+| # | Metot & URL | Açıklama |
+| :- | :--- | :--- |
+| 20 | `GET /api/admin/announcements` | Tüm duyurular (aktif + pasif), `sort_order` artan. |
+| 21 | `POST /api/admin/announcements` | Duyuru oluştur (`message` zorunlu; `link_url` / `link_campaign_id` / `is_active` / `sort_order` opsiyonel). **201**. |
+| 22 | `PUT /api/admin/announcements/:id` | Duyuru güncelle (yalnız gönderilen alanlar). |
+| 23 | `DELETE /api/admin/announcements/:id` | Duyuru sil. |
+
+### Genel / Sistem
+| # | Metot & URL | Açıklama |
+| :- | :--- | :--- |
+| 24 | `GET /api/admin/stats` | `totalCampaigns`, `totalCodes`, `usedCodes`, `remainingCodes`. |
+| 25 | `POST /api/admin/upload` | Görsel için **signed upload URL** döner (`{ filename }` → `{ path, token, publicUrl }`). Dosya sunucudan geçmez; istemci doğrudan Storage'a yükler. |
+| 26 | `DELETE /api/admin/reset` | Tüm `campaign_codes` + `campaign_claims` siler; kampanya/tür şablonları korunur. |
+| 27 | `GET /api/admin/health` | Sağlık anlık durumu (aşağıda). |
+| 28 | `GET /api/admin/health/probe` | Dış servisi aktif yokla (aşağıda). |
 
 ---
 
-### 1. Tüm Kampanyaları Listele (İstatistiklerle Birlikte)
-* **URL:** `/api/admin/campaigns`
-* **Metot:** `GET`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X GET http://localhost:3001/api/admin/campaigns \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ"
-  ```
-* **Başarılı Yanıt (200 OK):**
-  ```json
-  [
-    {
-      "id": "7fbe5012-e544-4822-a9b0-31db72b64d0b",
-      "slug": "brooks-brothers-2026",
-      "title": "Brooks Brothers Kampanyası",
-      "totalCodes": 150,
-      "usedCodes": 45,
-      "remainingCodes": 105
-    }
+### Sistem Sağlık Durumu (`GET /api/admin/health`)
+Dış servis hataları + sistem nabzı + kampanya bazında stok. Stok tek RPC (`campaign_stock_counts()`).
+
+```json
+{
+  "now": "2026-06-08T09:00:00.000Z",
+  "verifyFailures": { "last30m": 0, "lastAt": null },
+  "pulse": { "lastClaimAt": "2026-06-08T08:58:12.000Z", "todayCount": 142 },
+  "campaigns": [
+    { "id": "7fbe5012-…", "slug": "brooks-brothers-2026", "title": "…",
+      "is_active": true, "total": 500, "used": 142, "remaining": 358, "status": "ok" }
   ]
-  ```
+}
+```
+* `verifyFailures.last30m`: son 30 dk'daki `system_verify_failures` sayısı.
+* `pulse.todayCount`: **İstanbul (UTC+3)** gününde dağıtılan kod adedi.
+* `campaigns[].status`: `ok` · `low` (kalan ≤ eşik) · `out` (bitti) · `no_codes`. Eşik: `max(ceil(total*0.15), 25)`.
 
----
-
-### 2. Yeni Kampanya Oluştur
-* **URL:** `/api/admin/campaigns`
-* **Metot:** `POST`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X POST http://localhost:3001/api/admin/campaigns \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ" \
-    -H "Content-Type: application/json" \
-    -d '{"slug": "network-2026", "title": "Network %15 İndirim", "discount_label": "%15 İndirim"}'
-  ```
-
----
-
-### 3. Kampanya Bilgilerini Güncelle
-* **URL:** `/api/admin/campaigns/:id`
-* **Metot:** `PUT`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X PUT http://localhost:3001/api/admin/campaigns/7fbe5012-e544-4822-a9b0-31db72b64d0b \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ" \
-    -H "Content-Type: application/json" \
-    -d '{"is_active": true, "is_featured": true}'
-  ```
-
----
-
-### 4. Bulk (Toplu) Kod Yükle
-* **URL:** `/api/admin/campaigns/:id/codes`
-* **Metot:** `POST`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X POST http://localhost:3001/api/admin/campaigns/7fbe5012-e544-4822-a9b0-31db72b64d0b/codes \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ" \
-    -H "Content-Type: application/json" \
-    -d '{"codes": ["CODE1", "CODE2", "CODE3"]}'
-  ```
-* **Başarılı Yanıt (200 OK):**
-  ```json
-  {
-    "success": true,
-    "inserted": 2,
-    "duplicates": ["CODE1"]
-  }
-  ```
-
----
-
-### 5. Görsel Yükle (Image Upload)
-* **URL:** `/api/admin/upload`
-* **Metot:** `POST`
-* **Açıklama:** Dosya verisini sunucu üzerinden geçirmez. Supabase Storage için bir
-  *signed upload URL* (`path` + `token`) döner; istemci dosyayı bu token ile
-  doğrudan Supabase'e yükler (`uploadToSignedUrl`). Bu sayede Vercel serverless'ın
-  ~4.5MB istek gövdesi limiti ve base64 şişmesi devre dışı kalır.
-* **cURL Test Komutu:**
-  ```bash
-  curl -X POST http://localhost:3001/api/admin/upload \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ" \
-    -H "Content-Type: application/json" \
-    -d '{"filename": "logo.png"}'
-  ```
-* **Başarılı Yanıt (200 OK):**
-  ```json
-  {
-    "path": "1700000000000-abc123.png",
-    "token": "SIGNED_UPLOAD_TOKEN",
-    "publicUrl": "https://<proje>.supabase.co/storage/v1/object/public/campaign-images/1700000000000-abc123.png"
-  }
-  ```
-
----
-
-### 6. Üye Kod Sorgulama (Lookup)
-* **URL:** `/api/admin/campaigns/:id/lookup?tc_no=12345678901`
-* **Metot:** `GET`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X GET http://localhost:3001/api/admin/campaigns/7fbe5012-e544-4822-a9b0-31db72b64d0b/lookup?tc_no=12345678901 \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ"
-  ```
-
----
-
-### 7. Genel İstatistikler
-* **URL:** `/api/admin/stats`
-* **Metot:** `GET`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X GET http://localhost:3001/api/admin/stats \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ"
-  ```
-
----
-
-### 8. Kampanya Önizleme
-* **URL:** `/api/admin/campaigns/:id/preview`
-* **Metot:** `GET`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X GET http://localhost:3001/api/admin/campaigns/7fbe5012-e544-4822-a9b0-31db72b64d0b/preview \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ"
-  ```
-
----
-
-### 9. Sistemi Sıfırla (Reset)
-* **URL:** `/api/admin/reset`
-* **Metot:** `DELETE`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X DELETE http://localhost:3001/api/admin/reset \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ"
-  ```
-
----
-
-### 10. Kod Raporunu Dışa Aktar (CSV Export)
-Kampanyaya ait tüm kodları, kullanım durumlarını ve teslim alan T.C. numaralarını UTF-8 BOM'lu (Excel uyumlu) bir CSV dosyası olarak indirir.
-
-* **URL:** `/api/admin/campaigns/:id/export`
-* **Metot:** `GET`
-* **Yanıt:** `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment; filename="<slug>-kod-raporu.csv"`
-* **Sütunlar:** `İndirim Kodu, Kullanım Durumu, Kullanan T.C. No, Kullanım Tarihi`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X GET http://localhost:3001/api/admin/campaigns/7fbe5012-e544-4822-a9b0-31db72b64d0b/export \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ" -O
-  ```
-
----
-
-### 11. Sistem Sağlık Durumu (Health Snapshot)
-Sistem Sağlık Ekranını besleyen anlık durum: dış servis hataları, sistem nabzı ve kampanya bazında stok. Stok sayımları tek RPC (`campaign_stock_counts()`) ile alınır. Detay: [admin.md](admin.md#-sistem-sa%C4%9Fl%C4%B1%C4%9F%C4%B1-paneli).
-
-* **URL:** `/api/admin/health`
-* **Metot:** `GET`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X GET http://localhost:3001/api/admin/health \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ"
-  ```
-* **Başarılı Yanıt (200 OK):**
-  ```json
-  {
-    "now": "2026-06-07T09:00:00.000Z",
-    "verifyFailures": { "last30m": 0, "lastAt": null },
-    "pulse": { "lastClaimAt": "2026-06-07T08:58:12.000Z", "todayCount": 142 },
-    "campaigns": [
-      {
-        "id": "7fbe5012-...",
-        "slug": "brooks-brothers-2026",
-        "title": "Brooks Brothers Kampanyası",
-        "is_active": true,
-        "total": 500,
-        "used": 142,
-        "remaining": 358,
-        "status": "ok"
-      }
-    ]
-  }
-  ```
-  * `verifyFailures.last30m`: son 30 dakikadaki `system_verify_failures` kaydı sayısı.
-  * `pulse.todayCount`: **İstanbul (UTC+3)** gününde dağıtılan kod adedi (gün başlangıcı UTC'ye çevrilerek sayılır).
-  * `campaigns[].status`: `ok` · `low` (kalan ≤ eşik) · `out` (stok bitti) · `no_codes` (hiç kod yüklenmemiş). Eşik: `max(ceil(total*0.15), 25)`.
-
----
-
-### 12. Dış Servisi Aktif Yokla (Probe — "Şimdi test et")
-Dış üye doğrulama servisinin `/health` ucunu aktif olarak yoklar; `uye/borclu/degil` iş mantığına dokunmaz, yalnızca servis + DB ayakta mı bakar. 6 sn timeout'lu.
-
-* **URL:** `/api/admin/health/probe`
-* **Metot:** `GET`
-* **cURL Test Komutu:**
-  ```bash
-  curl -X GET http://localhost:3001/api/admin/health/probe \
-    -H "Authorization: Bearer SIZIN_JWT_TOKENINIZ"
-  ```
-* **Başarılı Yanıt (200 OK):**
-  ```json
-  { "ok": true, "status": 200, "ms": 187, "detail": "ok" }
-  ```
-  * `ok=false, status=null` → ağ hatası/timeout (`detail`: `network` | `timeout`).
-  * `status=404` → `/health` ucu henüz yayında değil (dış `talpa-uye` deploy bekliyor); panel bunu **kırmızı değil gri** ("yayında değil") gösterir.
-  * Sağlık URL'i `TALPA_MEMBER_HEALTH_URL`'den; tanımlı değilse `TALPA_MEMBER_API_URL`'in `/members/verify` → `/health` dönüşümünden türetilir.
+### Dış Servisi Aktif Yokla (`GET /api/admin/health/probe`)
+Dış servisin `/health` ucunu yoklar (iş mantığına dokunmaz, 6 sn timeout).
+```json
+{ "ok": true, "status": 200, "ms": 187, "detail": "ok" }
+```
+* `ok=false, status=null` → ağ hatası/timeout (`detail`: `network` | `timeout`).
+* `status=404` → `/health` henüz yayında değil; panel **gri** ("yayında değil") gösterir.
 
 ## Related Notes
 
 - [[README]]
 - [[admin]]
 - [[architecture]]
+- [[database]]
