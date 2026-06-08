@@ -585,6 +585,30 @@
   animation: ds-toast-in 0.2s ease-out;
 }
 
+/* ---------- Kodlarım ---------- */
+.ds-codelist { display: flex; flex-direction: column; gap: 0.75rem; }
+.ds-codecard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-r);
+}
+.ds-codecard__main { min-width: 0; }
+.ds-codecard__title { font-weight: 700; font-size: 0.95rem; color: var(--ds-ink); margin: 0 0 0.3rem; }
+.ds-codecard__code {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-weight: 800;
+  color: var(--ds-accent);
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+}
+.ds-codecard__date { font-size: 0.78rem; color: var(--ds-ink-faint); margin-top: 0.3rem; }
+.ds-codecard__copy { flex: 0 0 auto; }
+
 /* ---------- Mobil ---------- */
 @media (max-width: 520px) {
   .ds-btn { min-height: 48px; }

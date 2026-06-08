@@ -6,21 +6,22 @@ import Badge from './Badge';
 /**
  * Modern Minimal kampanya kartı.
  * `featured` → masaüstünde geniş yatay düzen (vitrin bayrak gemisi).
- * `to` verilmezse kart tıklanamaz (arşiv) — <div> olarak render edilir.
+ * `ended` → arşiv: tıklanamaz, "Sona erdi" rozeti, stok gizli, CTA yok.
  */
 export default function CampaignCardDS({
   campaign,
   featured = false,
-  linkTo = true,
+  ended = false,
 }: {
   campaign: Campaign;
   featured?: boolean;
-  linkTo?: boolean;
+  ended?: boolean;
 }) {
-  const soldOut = campaign.has_codes === false;
-  const lowStock = !soldOut && campaign.is_low_stock;
+  const isEnded = ended || campaign.status === 'expired' || campaign.status === 'archived';
+  const soldOut = !isEnded && (campaign.status === 'sold_out' || campaign.has_codes === false);
+  const lowStock = !isEnded && !soldOut && campaign.is_low_stock;
+  const clickable = !isEnded;
   const initial = (campaign.partner_name ?? campaign.title ?? 'T').charAt(0).toUpperCase();
-  const ended = campaign.status === 'expired' || campaign.status === 'archived';
 
   const inner = (
     <>
@@ -34,9 +35,9 @@ export default function CampaignCardDS({
           <Badge tone="accent">
             <Tag size={11} /> {campaign.discount_label}
           </Badge>
-          {ended && <Badge tone="neutral">Sona erdi</Badge>}
-          {!ended && soldOut && <Badge tone="danger">Tükendi</Badge>}
-          {!ended && lowStock && <Badge tone="warning">Son fırsat</Badge>}
+          {isEnded && <Badge tone="neutral">Sona erdi</Badge>}
+          {soldOut && <Badge tone="danger">Tükendi</Badge>}
+          {lowStock && <Badge tone="warning">Son fırsat</Badge>}
         </div>
       </div>
 
@@ -67,7 +68,7 @@ export default function CampaignCardDS({
           ) : (
             <span />
           )}
-          {linkTo && !ended && (
+          {clickable && (
             <span className={`ds-camp__cta${soldOut ? ' ds-camp__cta--muted' : ''}`}>
               {soldOut ? (
                 'Tükendi'
@@ -83,9 +84,9 @@ export default function CampaignCardDS({
     </>
   );
 
-  const cls = `ds-camp${featured ? ' ds-camp--featured' : ''}${linkTo ? '' : ' ds-camp--static'}`;
+  const cls = `ds-camp${featured ? ' ds-camp--featured' : ''}${clickable ? '' : ' ds-camp--static'}`;
 
-  if (!linkTo) {
+  if (!clickable) {
     return <div className={cls}>{inner}</div>;
   }
   return (
