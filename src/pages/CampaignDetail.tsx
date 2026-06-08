@@ -208,13 +208,16 @@ export default function CampaignDetail() {
               <>
                 <span className="sep" />
                 {campaign.partner_logo_url ? (
-                  <img
-                    src={campaign.partner_logo_url}
-                    alt={partner}
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
+                  <span className="ds-logo-chip">
+                    <img
+                      src={campaign.partner_logo_url}
+                      alt={partner}
+                      onError={(e) => {
+                        const chip = e.currentTarget.parentElement;
+                        if (chip) chip.style.display = 'none';
+                      }}
+                    />
+                  </span>
                 ) : (
                   <span style={{ fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{partner}</span>
                 )}

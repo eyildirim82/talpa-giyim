@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, Tag, Megaphone, Settings as SettingsIcon, LogOut, Plane } from 'lucide-react';
+import { LayoutDashboard, Package, Tag, Megaphone, Settings as SettingsIcon, LogOut } from 'lucide-react';
 import { useAuth } from './useAuth';
 import { AdminCtx } from './ctx';
 import Login from './Login';
@@ -42,8 +42,8 @@ export default function AdminApp() {
       <div className="ds ds-admin">
         <aside className="ds-side ds-side--navy">
           <div className="ds-side__brand">
-            <span style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto' }}>
-              <Plane size={17} color="#fff" />
+            <span className="ds-logo-chip">
+              <img src="/talpa-logo.webp" alt="TALPA" />
             </span>
             <span>TALPA<small>Yönetim Paneli</small></span>
           </div>

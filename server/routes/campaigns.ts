@@ -79,6 +79,8 @@ router.get('/campaigns', async (_req: Request, res: Response) => {
       getStockMap(),
     ]);
     if (error) throw error;
+    // Vitrin herkese aynı; Vercel CDN'inde paylaşımlı cache (browser'da değil).
+    res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
     res.json(((data ?? []) as unknown as CampaignRow[]).map((c) => withStock(c, stock)));
   } catch (err) {
     console.error('Kampanyalar alınamadı:', err);
@@ -99,6 +101,8 @@ router.get('/campaigns/archive', async (_req: Request, res: Response) => {
       getStockMap(),
     ]);
     if (error) throw error;
+    // Arşiv nadiren değişir → daha uzun CDN cache.
+    res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     res.json(((data ?? []) as unknown as CampaignRow[]).map((c) => withStock(c, stock)));
   } catch (err) {
     console.error('Arşiv alınamadı:', err);
@@ -114,6 +118,8 @@ router.get('/campaign-types', async (_req: Request, res: Response) => {
       .select('id, name, slug, sort_order')
       .order('sort_order', { ascending: true });
     if (error) throw error;
+    // Tür listesi nadiren değişir → uzun CDN cache.
+    res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     res.json(data ?? []);
   } catch (err) {
     console.error('Türler alınamadı:', err);
@@ -134,6 +140,7 @@ router.get('/announcements', async (_req: Request, res: Response) => {
       id: string; message: string; link_url: string | null;
       sort_order: number; link: { slug: string } | null;
     }[];
+    res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
     res.json(
       rows.map((a) => ({
         id: a.id,
@@ -179,6 +186,8 @@ router.get('/campaigns/:slug', async (req: Request, res: Response) => {
     else if (remaining <= 0) status = 'sold_out';
     else status = 'live';
 
+    // Stok'a duyarlı → kısa CDN cache (claim akışı sunucuda yeniden doğruluyor).
+    res.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
     res.json({
       ...c,
       has_codes: remaining > 0,

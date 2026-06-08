@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Tag, Calendar } from 'lucide-react';
 import type { Campaign } from '../../lib/types';
@@ -21,6 +22,7 @@ export default function CampaignCardDS({
   const clickable = !isEnded;
   const partner = campaign.partner_name ?? campaign.title;
   const tone = coverTone(campaign.slug || partner);
+  const [logoOk, setLogoOk] = useState(true);
 
   const inner = (
     <>
@@ -43,7 +45,20 @@ export default function CampaignCardDS({
       </div>
 
       <div className="ds-camp__body">
-        <div className="ds-camp__brand">{partner}</div>
+        <div className="ds-camp__brand">
+          {campaign.partner_logo_url && logoOk ? (
+            <span className="ds-logo-chip">
+              <img
+                src={campaign.partner_logo_url}
+                alt={partner}
+                loading="lazy"
+                onError={() => setLogoOk(false)}
+              />
+            </span>
+          ) : (
+            partner
+          )}
+        </div>
         <h3 className="ds-camp__title">{campaign.title}</h3>
         {campaign.description && <p className="ds-camp__desc">{campaign.description}</p>}
 

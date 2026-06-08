@@ -105,7 +105,21 @@
   text-decoration: none;
   letter-spacing: -0.01em;
 }
-.ds-nav__brand img { height: 28px; width: auto; display: block; }
+.ds-nav__brand img { height: 34px; width: auto; flex: 0 0 auto; object-fit: contain; display: block; }
+
+/* Beyaz logo "chip"i — koyu/şeffaf marka logolarını her zeminde (lacivert kenar
+   çubuğu, koyu kapak, beyaz cam) garantili görünür kılar. */
+.ds-logo-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 7px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+.ds-logo-chip img { display: block; width: auto; height: 100%; object-fit: contain; }
 .ds-nav__links { display: flex; align-items: center; gap: 0.25rem; }
 .ds-nav__link {
   display: inline-flex;
@@ -366,8 +380,9 @@
   padding: 1.15rem 1.2rem 1.3rem;
   flex: 1;
 }
-.ds-camp__brand { font-size: 0.8125rem; font-weight: 600; color: var(--ds-ink-soft); }
-.ds-camp__brand img { height: 22px; width: auto; object-fit: contain; display: block; }
+.ds-camp__brand { display: flex; align-items: center; min-height: 22px; font-size: 0.8125rem; font-weight: 600; color: var(--ds-ink-soft); }
+.ds-camp__brand .ds-logo-chip { height: 26px; padding: 3px 6px; }
+.ds-camp__brand img { height: 22px; width: auto; max-width: 120px; object-fit: contain; display: block; }
 .ds-camp__title { margin: 0; font-size: 1.0625rem; font-weight: 700; line-height: 1.3; color: var(--ds-ink); }
 .ds-camp__desc {
   margin: 0;
@@ -470,7 +485,9 @@
   flex-wrap: wrap;
   margin-bottom: 1.5rem;
 }
-.ds-logos img { height: 48px; width: auto; object-fit: contain; }
+.ds-logos img { height: 48px; width: auto; max-width: 180px; object-fit: contain; }
+.ds-logos .ds-logo-chip { height: 56px; }
+.ds-logos .ds-logo-chip img { max-width: 160px; }
 .ds-logos .sep { width: 1px; height: 34px; background: var(--ds-border-strong); }
 
 .ds-claim__title {
@@ -658,6 +675,7 @@
 }
 .ds-side__brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; padding: 0.4rem 0.6rem 1rem; }
 .ds-side__brand img { height: 24px; }
+.ds-side__brand .ds-logo-chip { height: 38px; }
 .ds-side__link {
   display: flex;
   align-items: center;
