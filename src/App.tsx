@@ -1,24 +1,23 @@
-import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
-import HomePage from './pages/HomePage';
-import CampaignPage from './pages/CampaignPage';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import './styles/design-system.css';
+import Home from './pages/Home';
+import MyCodes from './pages/MyCodes';
+import Archive from './pages/Archive';
+import CampaignDetail from './pages/CampaignDetail';
 import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   return (
     <Router>
-      <nav className="navbar">
-        <NavLink to="/" className="brand">
-          <img src="/talpa-logo.webp" alt="TALPA" style={{ height: '56px' }} />
-        </NavLink>
-      </nav>
-
-      <main>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/kampanya/:slug" element={<CampaignPage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-        </Routes>
-      </main>
+      <Routes>
+        {/* Yeni tasarım (Modern Minimal) — üye tarafı */}
+        <Route path="/" element={<Home />} />
+        <Route path="/kodlarim" element={<MyCodes />} />
+        <Route path="/arsiv" element={<Archive />} />
+        <Route path="/kampanya/:slug" element={<CampaignDetail />} />
+        {/* Henüz eski tasarımda — sırayla yenilenecek */}
+        <Route path="/admin" element={<AdminDashboard />} />
+      </Routes>
     </Router>
   );
 }

@@ -6,7 +6,7 @@ const router = Router();
 // Public uçların döndürdüğü ortak kampanya alanları (+ gömülü tür).
 const CAMPAIGN_FIELDS =
   'id, slug, title, description, partner_name, partner_logo_url, cover_image_url, ' +
-  'discount_label, is_featured, featured_order, valid_until, starts_at, ' +
+  'discount_label, is_featured, featured_order, valid_until, starts_at, created_at, ' +
   'max_codes_per_user, terms, type:campaign_types(id, name, slug)';
 
 type CampaignRow = {
@@ -22,6 +22,7 @@ type CampaignRow = {
   featured_order: number | null;
   valid_until: string | null;
   starts_at: string | null;
+  created_at: string;
   max_codes_per_user: number;
   terms: string | null;
   is_active?: boolean;

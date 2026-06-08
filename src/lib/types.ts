@@ -27,6 +27,7 @@ export type Campaign = {
   featured_order: number | null;
   valid_until: string | null;
   starts_at?: string | null;
+  created_at?: string;
   max_codes_per_user: number;
   terms: string | null;
   // Tür (yeni) — public uçlarda gömülü gelir.
