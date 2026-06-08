@@ -22,11 +22,13 @@ function ResultView({
   copiedKey,
   onCopy,
   onHome,
+  tc,
 }: {
   result: ClaimResponse;
   copiedKey: string | null;
   onCopy: (code: string, key: string) => void;
   onHome: () => void;
+  tc: string;
 }) {
   const codes = result.code ? [result.code] : result.codes ?? [];
   return (
@@ -71,7 +73,12 @@ function ResultView({
         );
       })}
 
-      <Link to="/kodlarim" className="ds-btn ds-btn--ghost ds-btn--block" style={{ marginTop: '0.25rem' }}>
+      <Link
+        to="/kodlarim"
+        state={{ tc }}
+        className="ds-btn ds-btn--ghost ds-btn--block"
+        style={{ marginTop: '0.25rem' }}
+      >
         Tüm kodlarım <ArrowRight size={15} />
       </Link>
       <button
@@ -290,7 +297,13 @@ export default function CampaignDetail() {
           )}
 
           {result ? (
-            <ResultView result={result} copiedKey={copiedKey} onCopy={handleCopy} onHome={() => navigate('/')} />
+            <ResultView
+              result={result}
+              copiedKey={copiedKey}
+              onCopy={handleCopy}
+              onHome={() => navigate('/')}
+              tc={tcNo}
+            />
           ) : formClosed ? (
             <Link to="/" className="ds-btn ds-btn--ghost ds-btn--block">
               Diğer kampanyalara dön
