@@ -449,4 +449,375 @@ router.get('/admin/campaigns/:id/export', async (req: Request, res: Response) =>
   }
 });
 
+// ───────────────────────── Türler (CRUD) ─────────────────────────
+
+function slugifyTr(text: string): string {
+  const map: Record<string, string> = {
+    'ç': 'c', 'Ç': 'c', 'ğ': 'g', 'Ğ': 'g', 'ı': 'i', 'I': 'i', 'İ': 'i',
+    'ö': 'o', 'Ö': 'o', 'ş': 's', 'Ş': 's', 'ü': 'u', 'Ü': 'u',
+  };
+  let s = text;
+  for (const k in map) s = s.replace(new RegExp(k, 'g'), map[k]);
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9 -]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+// POST /api/admin/campaign-types — tür oluştur
+router.post('/admin/campaign-types', async (req: Request, res: Response) => {
+  const body = req.body as { name?: string; slug?: string; sort_order?: number };
+  const name = body.name?.trim();
+  if (!name) {
+    res.status(400).json({ error: 'Tür adı zorunludur.' });
+    return;
+  }
+  const slug = body.slug?.trim() || slugifyTr(name);
+  try {
+    let sortOrder = body.sort_order;
+    if (sortOrder == null) {
+      const { data: maxRow } = await supabaseAdmin
+        .from('campaign_types')
+        .select('sort_order')
+        .order('sort_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      sortOrder = ((maxRow as { sort_order: number } | null)?.sort_order ?? -1) + 1;
+    }
+    const { data, error } = await supabaseAdmin
+      .from('campaign_types')
+      .insert({ name, slug, sort_order: sortOrder })
+      .select()
+      .single();
+    if (error) {
+      if (error.code === '23505') { res.status(409).json({ error: 'Bu slug zaten kullanımda.' }); return; }
+      throw error;
+    }
+    res.status(201).json(data);
+  } catch (err) {
+    console.error('Tür oluşturulamadı:', err);
+    res.status(500).json({ error: 'Tür oluşturulamadı.' });
+  }
+});
+
+// PUT /api/admin/campaign-types/:id — tür güncelle
+router.put('/admin/campaign-types/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const body = req.body as { name?: string; slug?: string; sort_order?: number };
+  const patch: Record<string, unknown> = {};
+  if (body.name != null) patch.name = body.name.trim();
+  if (body.slug != null) patch.slug = body.slug.trim();
+  if (body.sort_order != null) patch.sort_order = body.sort_order;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('campaign_types')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+    if (error) {
+      if (error.code === '23505') { res.status(409).json({ error: 'Bu slug zaten kullanımda.' }); return; }
+      throw error;
+    }
+    if (!data) { res.status(404).json({ error: 'Tür bulunamadı.' }); return; }
+    res.json(data);
+  } catch (err) {
+    console.error('Tür güncellenemedi:', err);
+    res.status(500).json({ error: 'Tür güncellenemedi.' });
+  }
+});
+
+// DELETE /api/admin/campaign-types/:id — tür sil (kullanımdaysa engellenir)
+router.delete('/admin/campaign-types/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const { error } = await supabaseAdmin.from('campaign_types').delete().eq('id', id);
+    if (error) {
+      if (error.code === '23503') {
+        res.status(409).json({
+          error: 'Bu tür bir veya daha fazla kampanyada kullanılıyor. Önce o kampanyaları başka türe taşıyın.',
+        });
+        return;
+      }
+      throw error;
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Tür silinemedi:', err);
+    res.status(500).json({ error: 'Tür silinemedi.' });
+  }
+});
+
+// ───────────────────────── Duyurular (CRUD) ─────────────────────────
+
+// GET /api/admin/announcements — tüm duyurular (aktif + pasif)
+router.get('/admin/announcements', async (_req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('announcements')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    res.json(data ?? []);
+  } catch (err) {
+    console.error('Duyurular alınamadı:', err);
+    res.status(500).json({ error: 'Duyurular alınamadı.' });
+  }
+});
+
+// POST /api/admin/announcements — duyuru oluştur
+router.post('/admin/announcements', async (req: Request, res: Response) => {
+  const body = req.body as {
+    message?: string; link_url?: string | null;
+    link_campaign_id?: string | null; is_active?: boolean; sort_order?: number;
+  };
+  const message = body.message?.trim();
+  if (!message) { res.status(400).json({ error: 'Duyuru metni zorunludur.' }); return; }
+  try {
+    let sortOrder = body.sort_order;
+    if (sortOrder == null) {
+      const { data: maxRow } = await supabaseAdmin
+        .from('announcements')
+        .select('sort_order')
+        .order('sort_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      sortOrder = ((maxRow as { sort_order: number } | null)?.sort_order ?? -1) + 1;
+    }
+    const { data, error } = await supabaseAdmin
+      .from('announcements')
+      .insert({
+        message,
+        link_url: body.link_url || null,
+        link_campaign_id: body.link_campaign_id || null,
+        is_active: body.is_active ?? false,
+        sort_order: sortOrder,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err) {
+    console.error('Duyuru oluşturulamadı:', err);
+    res.status(500).json({ error: 'Duyuru oluşturulamadı.' });
+  }
+});
+
+// PUT /api/admin/announcements/:id — duyuru güncelle
+router.put('/admin/announcements/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const body = req.body as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+  for (const key of ['message', 'link_url', 'link_campaign_id', 'is_active', 'sort_order']) {
+    if (key in body) patch[key] = body[key];
+  }
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('announcements')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) { res.status(404).json({ error: 'Duyuru bulunamadı.' }); return; }
+    res.json(data);
+  } catch (err) {
+    console.error('Duyuru güncellenemedi:', err);
+    res.status(500).json({ error: 'Duyuru güncellenemedi.' });
+  }
+});
+
+// DELETE /api/admin/announcements/:id — duyuru sil
+router.delete('/admin/announcements/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const { error } = await supabaseAdmin.from('announcements').delete().eq('id', id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Duyuru silinemedi:', err);
+    res.status(500).json({ error: 'Duyuru silinemedi.' });
+  }
+});
+
+// ───────────────────── Kampanya yaşam döngüsü ─────────────────────
+
+// POST /api/admin/campaigns/:id/clone — kampanyayı kopyala (kodlar/talepler HARİÇ)
+router.post('/admin/campaigns/:id/clone', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const { data: src, error: fetchErr } = await supabaseAdmin
+      .from('campaigns')
+      .select(
+        'slug, title, description, partner_name, partner_logo_url, cover_image_url, ' +
+        'discount_label, max_codes_per_user, valid_until, starts_at, terms, type_id, featured_order'
+      )
+      .eq('id', id)
+      .maybeSingle();
+    if (fetchErr) throw fetchErr;
+    if (!src) { res.status(404).json({ error: 'Kampanya bulunamadı.' }); return; }
+
+    const s = src as Record<string, unknown>;
+    const newSlug = `${s.slug as string}-kopya-${Date.now().toString(36)}`;
+    const { data, error } = await supabaseAdmin
+      .from('campaigns')
+      .insert({
+        ...s,
+        slug: newSlug,
+        title: `${s.title as string} (kopya)`,
+        is_active: false,
+        is_featured: false,
+        is_archived: false,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err) {
+    console.error('Kampanya kopyalanamadı:', err);
+    res.status(500).json({ error: 'Kampanya kopyalanamadı.' });
+  }
+});
+
+// DELETE /api/admin/campaigns/:id — kampanyayı kalıcı sil (kodlar/talepler cascade)
+router.delete('/admin/campaigns/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const { error } = await supabaseAdmin.from('campaigns').delete().eq('id', id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Kampanya silinemedi:', err);
+    res.status(500).json({ error: 'Kampanya silinemedi.' });
+  }
+});
+
+// ─────────────────────────── Kod havuzu ───────────────────────────
+
+// GET /api/admin/campaigns/:id/codes?search=&page=&pageSize= — kod havuzu (arama + sayfalama)
+router.get('/admin/campaigns/:id/codes', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const search = (req.query['search'] as string | undefined)?.trim();
+  const page = Math.max(1, parseInt((req.query['page'] as string) ?? '1', 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt((req.query['pageSize'] as string) ?? '50', 10) || 50));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  try {
+    let q = supabaseAdmin
+      .from('campaign_codes')
+      .select('id, code, is_used, claimed_by_tc, claimed_at', { count: 'exact' })
+      .eq('campaign_id', id);
+    if (search) q = q.ilike('code', `%${search}%`);
+    const { data, error, count } = await q
+      .order('is_used', { ascending: true })
+      .order('code', { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    res.json({ codes: data ?? [], total: count ?? 0, page, pageSize });
+  } catch (err) {
+    console.error('Kod havuzu alınamadı:', err);
+    res.status(500).json({ error: 'Kod havuzu alınamadı.' });
+  }
+});
+
+// POST /api/admin/campaigns/:id/codes/one — tek kod ekle
+router.post('/admin/campaigns/:id/codes/one', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const code = (req.body as { code?: string }).code?.trim();
+  if (!code) { res.status(400).json({ error: 'Kod zorunludur.' }); return; }
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('campaign_codes')
+      .insert({ campaign_id: id, code, is_used: false })
+      .select()
+      .single();
+    if (error) {
+      if (error.code === '23505') { res.status(409).json({ error: 'Bu kod zaten mevcut.' }); return; }
+      throw error;
+    }
+    res.status(201).json(data);
+  } catch (err) {
+    console.error('Kod eklenemedi:', err);
+    res.status(500).json({ error: 'Kod eklenemedi.' });
+  }
+});
+
+// PUT /api/admin/codes/:codeId — kod değerini düzelt (YALNIZ dağıtılmamış)
+router.put('/admin/codes/:codeId', async (req: Request, res: Response) => {
+  const { codeId } = req.params;
+  const code = (req.body as { code?: string }).code?.trim();
+  if (!code) { res.status(400).json({ error: 'Kod zorunludur.' }); return; }
+  try {
+    const { data: existing, error: fetchErr } = await supabaseAdmin
+      .from('campaign_codes')
+      .select('id, is_used')
+      .eq('id', codeId)
+      .maybeSingle();
+    if (fetchErr) throw fetchErr;
+    if (!existing) { res.status(404).json({ error: 'Kod bulunamadı.' }); return; }
+    if ((existing as { is_used: boolean }).is_used) {
+      res.status(409).json({ error: 'Dağıtılmış kod düzenlenemez.' });
+      return;
+    }
+    const { data, error } = await supabaseAdmin
+      .from('campaign_codes')
+      .update({ code })
+      .eq('id', codeId)
+      .select()
+      .single();
+    if (error) {
+      if (error.code === '23505') { res.status(409).json({ error: 'Bu kod zaten mevcut.' }); return; }
+      throw error;
+    }
+    res.json(data);
+  } catch (err) {
+    console.error('Kod güncellenemedi:', err);
+    res.status(500).json({ error: 'Kod güncellenemedi.' });
+  }
+});
+
+// DELETE /api/admin/codes/:codeId — tek kod sil (YALNIZ dağıtılmamış)
+router.delete('/admin/codes/:codeId', async (req: Request, res: Response) => {
+  const { codeId } = req.params;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('campaign_codes')
+      .delete()
+      .eq('id', codeId)
+      .eq('is_used', false)
+      .select('id')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) { res.status(409).json({ error: 'Kod bulunamadı veya dağıtılmış (silinemez).' }); return; }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Kod silinemedi:', err);
+    res.status(500).json({ error: 'Kod silinemedi.' });
+  }
+});
+
+// POST /api/admin/codes/bulk-delete — toplu kod sil (YALNIZ dağıtılmamış; kullanılmışlar atlanır)
+router.post('/admin/codes/bulk-delete', async (req: Request, res: Response) => {
+  const ids = (req.body as { ids?: unknown }).ids;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: 'Silinecek kod listesi gönderin.' });
+    return;
+  }
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('campaign_codes')
+      .delete()
+      .in('id', ids as string[])
+      .eq('is_used', false)
+      .select('id');
+    if (error) throw error;
+    res.json({ success: true, deleted: data?.length ?? 0 });
+  } catch (err) {
+    console.error('Toplu silme başarısız:', err);
+    res.status(500).json({ error: 'Toplu silme başarısız.' });
+  }
+});
+
 export default router;
