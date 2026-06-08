@@ -12,7 +12,7 @@ router.get('/admin/campaigns', async (req: Request, res: Response) => {
   try {
     const { data: campaigns, error } = await supabaseAdmin
       .from('campaigns')
-      .select('*')
+      .select('*, type:campaign_types(id, name, slug)')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -46,9 +46,25 @@ router.get('/admin/campaigns', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/campaign-types — tür listesi (form + tür yönetimi)
+router.get('/admin/campaign-types', async (_req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('campaign_types')
+      .select('id, name, slug, sort_order')
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    res.json(data ?? []);
+  } catch (err) {
+    console.error('Türler alınamadı:', err);
+    res.status(500).json({ error: 'Türler alınamadı.' });
+  }
+});
+
 // POST /api/admin/campaigns — yeni kampanya oluştur
 router.post('/admin/campaigns', async (req: Request, res: Response) => {
-  const { slug, title, discount_label } = req.body as Record<string, unknown>;
+  const body = { ...(req.body as Record<string, unknown>) };
+  const { slug, title, discount_label } = body;
 
   if (!slug || !title || !discount_label) {
     res.status(400).json({ error: 'slug, title ve discount_label zorunludur.' });
@@ -56,9 +72,21 @@ router.post('/admin/campaigns', async (req: Request, res: Response) => {
   }
 
   try {
+    // Tür zorunlu olacak (DB'de NOT NULL'a geçilecek). type_id gelmezse
+    // varsayılan türe (en düşük sort_order) düşerek hiçbir kaydı türsüz bırakma.
+    if (!body.type_id) {
+      const { data: defType } = await supabaseAdmin
+        .from('campaign_types')
+        .select('id')
+        .order('sort_order', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (defType) body.type_id = (defType as { id: string }).id;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('campaigns')
-      .insert(req.body as Record<string, unknown>)
+      .insert(body)
       .select()
       .single();
 

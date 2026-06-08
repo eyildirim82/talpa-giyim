@@ -8,13 +8,8 @@ function App() {
     <Router>
       <nav className="navbar">
         <NavLink to="/" className="brand">
-          <img src="/talpa-logo.webp" alt="TALPA" style={{ height: '32px' }} />
+          <img src="/talpa-logo.webp" alt="TALPA" style={{ height: '56px' }} />
         </NavLink>
-        <div className="nav-links">
-          <NavLink to="/" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Kampanyalar
-          </NavLink>
-        </div>
       </nav>
 
       <main>

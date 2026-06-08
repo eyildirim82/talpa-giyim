@@ -279,7 +279,7 @@ input:focus {
   padding: 1.25rem 2rem;
   border-bottom: 1px solid var(--border-color);
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   background-color: rgba(30, 41, 59, 0.8);
   backdrop-filter: blur(10px);
