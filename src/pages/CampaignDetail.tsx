@@ -248,7 +248,7 @@ export default function CampaignDetail() {
               </span>
               <button
                 type="button"
-                className="ds-btn ds-btn--primary"
+                className="ds-btn ds-btn--ghost"
                 style={{ marginTop: '0.75rem', alignSelf: 'flex-start' }}
                 onClick={() => void handleClaim()}
                 disabled={submitting}
@@ -352,7 +352,7 @@ export default function CampaignDetail() {
               <div className="ds-sticky">
                 <button
                   type="submit"
-                  className="ds-btn ds-btn--primary ds-btn--block"
+                  className="ds-btn ds-btn--accent ds-btn--block"
                   disabled={submitting || tcNo.length !== 11 || soldOut}
                 >
                   {soldOut ? (

@@ -7,46 +7,54 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Zemin & yüzey */
-  --ds-bg: #ffffff;
-  --ds-bg-subtle: #f6f7f9;
-  --ds-surface: #ffffff;
+  /* Zemin & yüzey — açık "üye loncası" (slate) */
+  --ds-bg: #f1f5f9;          /* slate-100 sayfa zemini */
+  --ds-bg-subtle: #f8fafc;   /* slate-50 */
+  --ds-surface: #ffffff;     /* kartlar, paneller */
+  --ds-sunken: #f1f5f9;      /* input / iç kuyular (slate-100) */
 
-  /* Kenarlık (ağır gölge yerine ince çizgi) */
-  --ds-border: #e6e8ec;
-  --ds-border-strong: #d2d6dc;
+  /* Kenarlık */
+  --ds-border: #e2e8f0;      /* slate-200 */
+  --ds-border-strong: #cbd5e1; /* slate-300 */
 
-  /* Metin — ink ölçeği */
-  --ds-ink: #0e1726;
-  --ds-ink-soft: #5a6472;
-  --ds-ink-faint: #8a94a3;
+  /* Metin — slate ink */
+  --ds-ink: #0f172a;         /* slate-900 */
+  --ds-ink-soft: #475569;    /* slate-600 */
+  --ds-ink-faint: #64748b;   /* slate-500 */
 
-  /* Tek vurgu — güven mavisi */
-  --ds-accent: #1d4ed8;
-  --ds-accent-hover: #1a45be;
-  --ds-accent-soft: #eaf0fe;
-  --ds-accent-line: #dbe4fb;
+  /* Birincil aksiyon — TALPA navy */
+  --ds-primary: #1a2f5c;     /* navy-800 */
+  --ds-primary-hover: #16264a;
 
-  /* Semantik (vurgudan ayrı) */
-  --ds-success: #0f7a52;
-  --ds-success-soft: #e7f4ee;
-  --ds-danger: #c2362b;
-  --ds-danger-soft: #fdecea;
-  --ds-warning: #9a6b12;
-  --ds-warning-soft: #f9f0db;
+  /* Vurgu — emerald (kod, başarı, claim CTA) */
+  --ds-accent: #059669;      /* emerald-600 */
+  --ds-accent-hover: #047857;
+  --ds-accent-soft: #ecfdf5;
+  --ds-accent-line: rgba(5, 150, 105, 0.28);
+
+  /* Semantik */
+  --ds-success: #059669;
+  --ds-success-soft: rgba(16, 185, 129, 0.12);
+  --ds-danger: #dc2626;
+  --ds-danger-soft: rgba(239, 68, 68, 0.10);
+  --ds-warning: #d97706;
+  --ds-warning-soft: rgba(245, 158, 11, 0.14);
+  --ds-info: #2563eb;
+  --ds-info-soft: rgba(37, 99, 235, 0.10);
 
   /* Yarıçap */
-  --ds-r-sm: 8px;
-  --ds-r: 12px;
-  --ds-r-lg: 16px;
+  --ds-r-sm: 0.375rem;
+  --ds-r: 0.5rem;     /* buton / input */
+  --ds-r-lg: 1rem;    /* kart */
+  --ds-r-xl: 1.25rem; /* hero / cam panel */
   --ds-r-full: 999px;
 
-  /* Gölge — minimal */
-  --ds-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
-  --ds-shadow-lg: 0 10px 28px rgba(16, 24, 40, 0.08);
+  /* Gölge */
+  --ds-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --ds-shadow-lg: 0 12px 30px rgba(15, 23, 42, 0.10);
 
-  /* Odak halkası */
-  --ds-ring: 0 0 0 4px rgba(29, 78, 216, 0.18);
+  /* Odak halkası — navy */
+  --ds-ring: 0 0 0 4px rgba(26, 47, 92, 0.15);
 }
 
 /* Kök sarmalayıcı: açık tema bağlamını burada kurar */
@@ -111,14 +119,14 @@
   border-radius: var(--ds-r-sm);
   transition: color 0.15s, background 0.15s;
 }
-.ds-nav__link:hover,
-.ds-nav__link.active { color: var(--ds-ink); background: var(--ds-bg-subtle); }
+.ds-nav__link:hover { color: var(--ds-ink); background: var(--ds-bg-subtle); }
+.ds-nav__link.active { color: var(--ds-primary); font-weight: 700; }
 
 /* ---------- Duyuru şeridi ---------- */
 .ds-announce {
-  background: var(--ds-accent-soft);
-  border-bottom: 1px solid var(--ds-accent-line);
-  color: var(--ds-accent);
+  background: var(--ds-info-soft);
+  border-bottom: 1px solid rgba(37, 99, 235, 0.28);
+  color: var(--ds-info);
 }
 .ds-announce__inner {
   max-width: 1040px;
@@ -136,9 +144,9 @@
 .ds-announce__dots { display: inline-flex; gap: 0.3rem; margin-left: 0.5rem; }
 .ds-announce__dot {
   width: 6px; height: 6px; border-radius: 50%;
-  background: var(--ds-accent-line); border: none; padding: 0; cursor: pointer;
+  background: rgba(37, 99, 235, 0.28); border: none; padding: 0; cursor: pointer;
 }
-.ds-announce__dot.active { background: var(--ds-accent); }
+.ds-announce__dot.active { background: var(--ds-info); }
 
 /* ---------- Başlık bloğu ---------- */
 .ds-hero { padding: 2rem 0 1.5rem; }
@@ -147,7 +155,7 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--ds-accent);
+  color: var(--ds-ink-faint);
 }
 .ds-h1 {
   margin: 0.55rem 0 0.5rem;
@@ -200,8 +208,8 @@
 .ds-tab:hover { border-color: var(--ds-border-strong); }
 .ds-tab.active {
   color: #fff;
-  background: var(--ds-accent);
-  border-color: var(--ds-accent);
+  background: var(--ds-primary);
+  border-color: var(--ds-primary);
 }
 
 /* ---------- Araç çubuğu (arama + sıralama) ---------- */
@@ -237,7 +245,7 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .ds-search .ds-input { padding-left: 2.4rem; }
-.ds-input:focus { outline: none; border-color: var(--ds-accent); box-shadow: var(--ds-ring); }
+.ds-input:focus { outline: none; border-color: var(--ds-primary); box-shadow: var(--ds-ring); }
 .ds-select {
   font: inherit;
   font-size: 0.9rem;
@@ -249,7 +257,7 @@
   padding: 0.65rem 0.8rem;
   cursor: pointer;
 }
-.ds-select:focus { outline: none; border-color: var(--ds-accent); box-shadow: var(--ds-ring); }
+.ds-select:focus { outline: none; border-color: var(--ds-primary); box-shadow: var(--ds-ring); }
 
 /* ---------- Izgara ---------- */
 .ds-grid {
@@ -278,8 +286,10 @@
 }
 .ds-btn:active { transform: translateY(1px); }
 .ds-btn:focus-visible { outline: none; box-shadow: var(--ds-ring); }
-.ds-btn--primary { background: var(--ds-accent); color: #fff; }
-.ds-btn--primary:hover { background: var(--ds-accent-hover); }
+.ds-btn--primary { background: var(--ds-primary); color: #fff; }
+.ds-btn--primary:hover { background: var(--ds-primary-hover); }
+.ds-btn--accent { background: var(--ds-accent); color: #fff; }
+.ds-btn--accent:hover { background: var(--ds-accent-hover); }
 .ds-btn--ghost { background: transparent; color: var(--ds-ink); border-color: var(--ds-border-strong); }
 .ds-btn--ghost:hover { background: var(--ds-bg-subtle); }
 .ds-btn--block { width: 100%; }
@@ -318,8 +328,8 @@
 }
 .ds-camp:hover {
   box-shadow: var(--ds-shadow-lg);
-  transform: translateY(-3px);
-  border-color: var(--ds-border-strong);
+  transform: translateY(-4px);
+  border-color: var(--ds-accent);
 }
 .ds-camp--static:hover { transform: none; box-shadow: var(--ds-shadow); border-color: var(--ds-border); }
 .ds-camp__media {
@@ -491,10 +501,10 @@
 
 .ds-codebox {
   text-align: center;
-  border: 2px dashed var(--ds-accent-line);
-  background: var(--ds-accent-soft);
+  border: 2px dashed var(--ds-accent);
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
   border-radius: var(--ds-r-lg);
-  padding: 1.5rem 1.25rem;
+  padding: 1.75rem 1.25rem;
   margin: 1.25rem 0;
 }
 .ds-codebox__label {
@@ -507,11 +517,12 @@
 .ds-codebox__row { display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
 .ds-codebox__code {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  font-size: clamp(1.5rem, 6vw, 2rem);
+  font-size: clamp(1.6rem, 7vw, 2.6rem);
   font-weight: 800;
   color: var(--ds-accent);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   word-break: break-all;
+  text-shadow: 0 0 18px rgba(16, 185, 129, 0.25);
 }
 .ds-copy {
   display: inline-flex;
@@ -542,7 +553,7 @@
   line-height: 1.5;
 }
 .ds-alert svg { flex: 0 0 auto; margin-top: 1px; }
-.ds-alert--info { background: var(--ds-accent-soft); color: var(--ds-accent); border-color: var(--ds-accent-line); }
+.ds-alert--info { background: var(--ds-info-soft); color: var(--ds-info); border-color: rgba(37, 99, 235, 0.28); }
 .ds-alert--success { background: var(--ds-success-soft); color: var(--ds-success); border-color: #cfe8dc; }
 .ds-alert--warning { background: var(--ds-warning-soft); color: var(--ds-warning); border-color: #efe1c2; }
 .ds-alert--danger { background: var(--ds-danger-soft); color: var(--ds-danger); border-color: #f6d9d6; }
