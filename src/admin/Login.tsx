@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Plane, ArrowRight } from 'lucide-react';
+import { usePageTitle, ADMIN_BRAND } from '../lib/usePageTitle';
 
 type SignIn = (email: string, password: string) => Promise<{ error: unknown }>;
 
 export default function Login({ signIn }: { signIn: SignIn }) {
+  usePageTitle('Yönetici Girişi', ADMIN_BRAND);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);

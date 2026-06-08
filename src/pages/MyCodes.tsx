@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Search, Loader2, AlertCircle, RefreshCw, Copy, CheckCircle, X } from 'lucide-react';
 import { isValidTC } from '../lib/tc';
 import DsNav from '../components/ds/DsNav';
+import { usePageTitle } from '../lib/usePageTitle';
 
 type MyCode = {
   code: string;
@@ -21,6 +22,7 @@ export default function MyCodes() {
   const location = useLocation();
   const presetTc = (location.state as { tc?: string } | null)?.tc ?? '';
 
+  usePageTitle('Kodlarım');
   const [tcNo, setTcNo] = useState(presetTc);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

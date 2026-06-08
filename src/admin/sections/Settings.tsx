@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useAdmin } from '../ctx';
+import { usePageTitle, ADMIN_BRAND } from '../../lib/usePageTitle';
 
 const CONFIRM_WORD = 'SIFIRLA';
 
 export default function Settings() {
+  usePageTitle('Ayarlar', ADMIN_BRAND);
   const { getAuthHeaders, notify } = useAdmin();
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);

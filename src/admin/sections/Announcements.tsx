@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, X, Link as LinkIcon } from 'lucide-react';
 import { useAdmin } from '../ctx';
+import { usePageTitle, ADMIN_BRAND } from '../../lib/usePageTitle';
 
 type Announcement = {
   id: string;
@@ -24,6 +25,7 @@ type Draft = {
 const EMPTY: Draft = { id: null, message: '', link_campaign_id: '', link_url: '', is_active: false };
 
 export default function Announcements() {
+  usePageTitle('Duyurular', ADMIN_BRAND);
   const { getAuthHeaders, notify } = useAdmin();
   const [items, setItems] = useState<Announcement[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOpt[]>([]);

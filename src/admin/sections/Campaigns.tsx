@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Plus, Search, Copy, Archive, ArchiveRestore, Trash2, Pencil, X } from 'lucide-react';
 import type { CampaignType } from '../../lib/types';
 import { useAdmin } from '../ctx';
+import { usePageTitle, ADMIN_BRAND } from '../../lib/usePageTitle';
 
 type AdminCampaign = {
   id: string;
@@ -54,6 +55,7 @@ const EMPTY_NEW = {
 };
 
 export default function Campaigns() {
+  usePageTitle('Kampanyalar', ADMIN_BRAND);
   const { getAuthHeaders, notify, signOut } = useAdmin();
   const [campaigns, setCampaigns] = useState<AdminCampaign[]>([]);
   const [types, setTypes] = useState<CampaignType[]>([]);

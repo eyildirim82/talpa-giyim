@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import type { Campaign } from '../lib/types';
 import DsNav from '../components/ds/DsNav';
 import CampaignCardDS from '../components/ds/CampaignCardDS';
+import { usePageTitle } from '../lib/usePageTitle';
 
 export default function Archive() {
+  usePageTitle('Arşiv');
   const [items, setItems] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
 

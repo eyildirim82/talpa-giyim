@@ -7,6 +7,7 @@ import {
 import type { Campaign } from '../lib/types';
 import { isValidTC } from '../lib/tc';
 import { coverTone } from '../lib/cover';
+import { usePageTitle } from '../lib/usePageTitle';
 
 type ClaimResponse = {
   alreadyClaimed: boolean;
@@ -94,6 +95,7 @@ export default function CampaignDetail() {
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
+  usePageTitle(campaign?.title ?? 'Kampanya');
   const [tcNo, setTcNo] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);

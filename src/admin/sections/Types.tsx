@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Check, X, ChevronUp, ChevronDown } from 'lucide-react';
 import type { CampaignType } from '../../lib/types';
 import { useAdmin } from '../ctx';
+import { usePageTitle, ADMIN_BRAND } from '../../lib/usePageTitle';
 
 export default function Types() {
+  usePageTitle('Türler', ADMIN_BRAND);
   const { getAuthHeaders, notify } = useAdmin();
   const [items, setItems] = useState<CampaignType[]>([]);
   const [loading, setLoading] = useState(true);

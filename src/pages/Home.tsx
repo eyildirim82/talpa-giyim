@@ -6,10 +6,12 @@ import DsNav from '../components/ds/DsNav';
 import AnnouncementBar from '../components/ds/AnnouncementBar';
 import CampaignCardDS from '../components/ds/CampaignCardDS';
 import FeaturedHeroDS from '../components/ds/FeaturedHeroDS';
+import { usePageTitle } from '../lib/usePageTitle';
 
 type Sort = 'default' | 'new' | 'ending';
 
 export default function Home() {
+  usePageTitle();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [types, setTypes] = useState<CampaignType[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);

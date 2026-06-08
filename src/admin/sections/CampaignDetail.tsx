@@ -9,6 +9,7 @@ import type { CampaignType } from '../../lib/types';
 import { supabase } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageCompress';
 import { useAdmin } from '../ctx';
+import { usePageTitle, ADMIN_BRAND } from '../../lib/usePageTitle';
 
 type FullCampaign = {
   id: string; slug: string; title: string; description: string | null;
@@ -299,6 +300,7 @@ export default function CampaignDetail() {
 
   const [campaign, setCampaign] = useState<FullCampaign | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  usePageTitle(campaign?.title ?? 'Kampanya', ADMIN_BRAND);
   const [types, setTypes] = useState<CampaignType[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

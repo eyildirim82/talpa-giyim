@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAdmin } from '../ctx';
 import SystemHealthDS from '../SystemHealthDS';
+import { usePageTitle, ADMIN_BRAND } from '../../lib/usePageTitle';
 
 type Stats = {
   totalCampaigns: number;
@@ -19,6 +20,7 @@ function Stat({ label, value }: { label: string; value?: number }) {
 }
 
 export default function Overview() {
+  usePageTitle('Genel Bakış', ADMIN_BRAND);
   const { getAuthHeaders } = useAdmin();
   const [stats, setStats] = useState<Stats | null>(null);
 
