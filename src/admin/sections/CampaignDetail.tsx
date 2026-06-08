@@ -354,8 +354,16 @@ export default function CampaignDetail() {
       const { path, token, publicUrl } = (await res.json()) as { path: string; token: string; publicUrl: string };
       const { error } = await supabase.storage.from('campaign-images').uploadToSignedUrl(path, token, optimized, { contentType: optimized.type });
       if (error) throw error;
-      setF(key === 'logo' ? 'partner_logo_url' : 'cover_image_url', publicUrl);
-      notify('success', 'Görsel yüklendi.');
+      const field = key === 'logo' ? 'partner_logo_url' : 'cover_image_url';
+      // Görseli sunucuya hemen yaz; böylece "Kaydet"e basmadan sayfa yenilense
+      // bile yeni görsel kalıcı olur (eski görsel geri gelmez).
+      const saveRes = await fetch(`/api/admin/campaigns/${id}`, {
+        method: 'PUT', headers, body: JSON.stringify({ [field]: publicUrl }),
+      });
+      if (!saveRes.ok) throw new Error('Görsel kaydedilemedi');
+      setF(field, publicUrl);
+      setCampaign((c) => (c ? { ...c, [field]: publicUrl } : c));
+      notify('success', 'Görsel yüklendi ve kaydedildi.');
     } catch (err) {
       notify('error', err instanceof Error ? err.message : 'Görsel yüklenemedi.');
     } finally {
@@ -518,7 +526,7 @@ export default function CampaignDetail() {
             <button type="button" className={`ds-toggle${form.is_featured ? ' on' : ''}`} onClick={() => setF('is_featured', !form.is_featured)}>Öne çıkan</button>
             <button type="button" className={`ds-toggle${form.is_archived ? ' on' : ''}`} onClick={() => setF('is_archived', !form.is_archived)}>Arşiv</button>
           </div>
-          <button type="button" className="ds-btn ds-btn--primary ds-btn--block" onClick={() => void save()} disabled={saving}>
+          <button type="button" className="ds-btn ds-btn--primary ds-btn--block" onClick={() => void save()} disabled={saving || !!uploading.logo || !!uploading.cover}>
             <Save size={16} /> {saving ? 'Kaydediliyor…' : 'Kaydet'}
           </button>
         </div>
