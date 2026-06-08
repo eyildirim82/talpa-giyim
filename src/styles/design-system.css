@@ -309,6 +309,7 @@
   white-space: nowrap;
 }
 .ds-badge--accent { background: var(--ds-accent-soft); color: var(--ds-accent); border-color: var(--ds-accent-line); }
+.ds-badge--info { background: var(--ds-info-soft); color: var(--ds-info); border-color: rgba(37, 99, 235, 0.28); }
 .ds-badge--danger { background: var(--ds-danger-soft); color: var(--ds-danger); border-color: #f6d9d6; }
 .ds-badge--warning { background: var(--ds-warning-soft); color: var(--ds-warning); border-color: #efe1c2; }
 .ds-badge--neutral { background: var(--ds-bg-subtle); color: var(--ds-ink-soft); border-color: var(--ds-border); }
@@ -791,4 +792,114 @@
 
 @media (max-width: 760px) {
   .ds-cols { grid-template-columns: 1fr; }
+}
+
+/* ======================================================
+   HI-FI: kapaklar · kart navy CTA · featured hero · cam detay
+   ====================================================== */
+
+/* Editorial gradient kapak (görsel yoksa) */
+.ds-cover-ph { position: relative; overflow: hidden; }
+.ds-cover-ph::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(120% 80% at 70% 10%, rgba(255, 240, 214, 0.22), transparent 55%);
+}
+.ds-cover-ph::after {
+  content: ''; position: absolute; inset: 0; opacity: 0.5; mix-blend-mode: overlay;
+  background-image: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 6px);
+}
+.ds-cover-ph--bb { background: linear-gradient(150deg, #3b3026 0%, #5b4632 45%, #2a2018 100%); }
+.ds-cover-ph--navy { background: linear-gradient(150deg, #1a2f5c 0%, #22386b 55%, #16264a 100%); }
+.ds-cover-ph--warm { background: linear-gradient(150deg, #4a3b2e 0%, #6b5036 50%, #33271c 100%); }
+.ds-cover-ph--slate { background: linear-gradient(150deg, #334155 0%, #475569 55%, #1e293b 100%); }
+.ds-cover-ph--green { background: linear-gradient(150deg, #1f3d2e 0%, #2f5d44 55%, #14271c 100%); }
+
+/* Kapak üstü partner wordmark */
+.ds-camp__wm {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  font-size: 0.9rem; opacity: 0.92;
+}
+
+/* Kart alt CTA — navy bar */
+.ds-camp__btn {
+  padding: 0.6rem 1rem; text-align: center; font-size: 0.875rem; font-weight: 600;
+  border-radius: var(--ds-r); background: var(--ds-primary); color: #fff;
+}
+.ds-camp__btn--out { background: var(--ds-border); color: var(--ds-ink-faint); }
+
+/* Featured hero — koyu kapak + scrim + beyaz içerik */
+.ds-fhero {
+  position: relative; overflow: hidden; min-height: 380px; display: flex; align-items: flex-end;
+  border-radius: var(--ds-r-xl); border: 1px solid var(--ds-border); text-decoration: none;
+  color: #fff; transition: box-shadow 0.2s;
+}
+.ds-fhero:hover { box-shadow: 0 20px 50px rgba(15, 23, 42, 0.20); }
+.ds-fhero > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ds-fhero__scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.97) 0%, rgba(15, 23, 42, 0.55) 50%, rgba(15, 23, 42, 0.15) 100%);
+}
+.ds-fhero__body { position: relative; padding: 2rem; width: 100%; }
+.ds-fhero__title { margin: 0 0 0.6rem; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800; line-height: 1.15; max-width: 640px; }
+.ds-fhero__desc { margin: 0 0 1.25rem; color: #e2e8f0; max-width: 560px; line-height: 1.55; font-size: 0.95rem; }
+.ds-fhero__meta { display: inline-flex; align-items: center; gap: 0.4rem; color: rgba(255, 255, 255, 0.78); font-size: 0.85rem; }
+.ds-fhero__cta {
+  display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.7rem 1.4rem;
+  font-weight: 700; border-radius: var(--ds-r); background: var(--ds-accent); color: #fff;
+}
+
+/* Kampanya detay — kapak üstü buzlu cam kart */
+.ds-detail-cover { position: relative; min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 3rem 1rem; }
+.ds-detail-cover > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ds-glass {
+  position: relative; width: 100%; max-width: 680px;
+  background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--ds-border); border-radius: var(--ds-r-xl); padding: 2.5rem; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.20);
+}
+.ds-glass__heading {
+  text-align: center; font-size: clamp(1.5rem, 4vw, 1.9rem); font-weight: 800; line-height: 1.15; margin: 0 0 0.5rem;
+  background: linear-gradient(135deg, var(--ds-primary), #7c3aed);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.ds-backfloat {
+  position: absolute; top: 1.25rem; left: 1.25rem; z-index: 2;
+  display: inline-flex; align-items: center; gap: 0.35rem; color: #fff; font-weight: 600; font-size: 0.875rem;
+  text-decoration: none; background: rgba(15, 23, 42, 0.35); padding: 0.4rem 0.7rem; border-radius: var(--ds-r); backdrop-filter: blur(4px);
+}
+.ds-backfloat:hover { background: rgba(15, 23, 42, 0.5); }
+
+@media (max-width: 520px) {
+  .ds-fhero { min-height: 320px; }
+  .ds-fhero__body { padding: 1.5rem; }
+  .ds-detail-cover { padding: 1.5rem 1rem; }
+  .ds-glass { padding: 1.75rem; }
+}
+
+/* ======================================================
+   HI-FI: admin navy sidebar + login iki sütun
+   ====================================================== */
+.ds-side--navy { background: var(--ds-primary); border-right: none; color: #fff; }
+.ds-side--navy .ds-side__brand { color: #fff; }
+.ds-side--navy .ds-side__brand small { display: block; font-size: 0.7rem; color: rgba(255, 255, 255, 0.6); font-weight: 400; }
+.ds-side--navy .ds-side__link { color: rgba(255, 255, 255, 0.85); }
+.ds-side--navy .ds-side__link:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.ds-side--navy .ds-side__link.active { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.ds-side__foot {
+  margin-top: auto; border-top: 1px solid rgba(255, 255, 255, 0.16); padding-top: 0.875rem;
+  display: flex; align-items: center; gap: 0.6rem; color: #fff;
+}
+.ds-side__avatar {
+  width: 30px; height: 30px; border-radius: 999px; background: rgba(255, 255, 255, 0.18);
+  display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex: 0 0 auto;
+}
+.ds-side__logout { margin-left: auto; background: none; border: none; color: rgba(255, 255, 255, 0.7); cursor: pointer; display: flex; padding: 0.3rem; }
+.ds-side__logout:hover { color: #fff; }
+
+.ds-login { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; background: var(--ds-surface); }
+.ds-login__brandside { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 2.5rem; color: #fff; }
+.ds-login__formside { display: flex; align-items: center; justify-content: center; padding: 2.5rem; }
+@media (max-width: 760px) {
+  .ds-login { grid-template-columns: 1fr; }
+  .ds-login__brandside { display: none; }
 }

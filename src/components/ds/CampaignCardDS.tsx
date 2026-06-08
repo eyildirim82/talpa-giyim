@@ -1,27 +1,26 @@
 import { Link } from 'react-router-dom';
-import { Tag, Calendar, ArrowRight } from 'lucide-react';
+import { Tag, Calendar } from 'lucide-react';
 import type { Campaign } from '../../lib/types';
+import { coverTone } from '../../lib/cover';
 import Badge from './Badge';
 
 /**
- * Modern Minimal kampanya kartı.
- * `featured` → masaüstünde geniş yatay düzen (vitrin bayrak gemisi).
- * `ended` → arşiv: tıklanamaz, "Sona erdi" rozeti, stok gizli, CTA yok.
+ * Hi-fi kampanya kartı — gradient kapak (görsel yoksa) + navy "Kodu Al" bar.
+ * `ended` → arşiv: tıklanamaz, "Sona erdi", CTA yok.
  */
 export default function CampaignCardDS({
   campaign,
-  featured = false,
   ended = false,
 }: {
   campaign: Campaign;
-  featured?: boolean;
   ended?: boolean;
 }) {
   const isEnded = ended || campaign.status === 'expired' || campaign.status === 'archived';
   const soldOut = !isEnded && (campaign.status === 'sold_out' || campaign.has_codes === false);
   const lowStock = !isEnded && !soldOut && campaign.is_low_stock;
   const clickable = !isEnded;
-  const initial = (campaign.partner_name ?? campaign.title ?? 'T').charAt(0).toUpperCase();
+  const partner = campaign.partner_name ?? campaign.title;
+  const tone = coverTone(campaign.slug || partner);
 
   const inner = (
     <>
@@ -29,7 +28,9 @@ export default function CampaignCardDS({
         {campaign.cover_image_url ? (
           <img src={campaign.cover_image_url} alt={campaign.title} loading="lazy" />
         ) : (
-          <div className="ds-camp__placeholder">{initial}</div>
+          <div className={`ds-cover-ph ds-cover-ph--${tone}`} style={{ position: 'absolute', inset: 0 }}>
+            <div className="ds-camp__wm">{partner}</div>
+          </div>
         )}
         <div className="ds-camp__badges">
           <Badge tone="accent">
@@ -42,50 +43,28 @@ export default function CampaignCardDS({
       </div>
 
       <div className="ds-camp__body">
-        <div className="ds-camp__brand">
-          {campaign.partner_logo_url ? (
-            <img
-              src={campaign.partner_logo_url}
-              alt={campaign.partner_name ?? ''}
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
-          ) : (
-            campaign.partner_name
-          )}
-        </div>
-
+        <div className="ds-camp__brand">{partner}</div>
         <h3 className="ds-camp__title">{campaign.title}</h3>
         {campaign.description && <p className="ds-camp__desc">{campaign.description}</p>}
 
-        <div className="ds-camp__foot">
-          {campaign.valid_until ? (
-            <span className="ds-camp__meta">
-              <Calendar size={13} />
-              {new Date(campaign.valid_until).toLocaleDateString('tr-TR')}
-            </span>
-          ) : (
-            <span />
+        <div style={{ marginTop: 'auto' }}>
+          {campaign.valid_until && (
+            <div className="ds-camp__meta" style={{ marginBottom: '0.75rem' }}>
+              <Calendar size={12} />
+              {new Date(campaign.valid_until).toLocaleDateString('tr-TR')} tarihine kadar
+            </div>
           )}
-          {clickable && (
-            <span className={`ds-camp__cta${soldOut ? ' ds-camp__cta--muted' : ''}`}>
-              {soldOut ? (
-                'Tükendi'
-              ) : (
-                <>
-                  Kodu Al <ArrowRight size={15} />
-                </>
-              )}
-            </span>
+          {!isEnded && (
+            <div className={`ds-camp__btn${soldOut ? ' ds-camp__btn--out' : ''}`}>
+              {soldOut ? 'Tükendi' : 'Kodu Al →'}
+            </div>
           )}
         </div>
       </div>
     </>
   );
 
-  const cls = `ds-camp${featured ? ' ds-camp--featured' : ''}${clickable ? '' : ' ds-camp--static'}`;
-
+  const cls = `ds-camp${clickable ? '' : ' ds-camp--static'}`;
   if (!clickable) {
     return <div className={cls}>{inner}</div>;
   }

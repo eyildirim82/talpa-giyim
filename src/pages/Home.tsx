@@ -5,6 +5,7 @@ import type { Campaign, CampaignType, Announcement } from '../lib/types';
 import DsNav from '../components/ds/DsNav';
 import AnnouncementBar from '../components/ds/AnnouncementBar';
 import CampaignCardDS from '../components/ds/CampaignCardDS';
+import FeaturedHeroDS from '../components/ds/FeaturedHeroDS';
 
 type Sort = 'default' | 'new' | 'ending';
 
@@ -149,7 +150,7 @@ export default function Home() {
                 </h2>
                 <div style={{ display: 'grid', gap: '1.25rem', marginBottom: '0.5rem' }}>
                   {featured.map((c) => (
-                    <CampaignCardDS key={c.id} campaign={c} featured />
+                    <FeaturedHeroDS key={c.id} campaign={c} />
                   ))}
                 </div>
               </>

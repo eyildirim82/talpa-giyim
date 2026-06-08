@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-type Tone = 'accent' | 'danger' | 'warning' | 'neutral';
+type Tone = 'accent' | 'danger' | 'warning' | 'neutral' | 'info';
 
 /** Küçük durum/etiket rozeti. Vurgu (mavi) ile semantik renkler ayrıdır. */
 export default function Badge({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {

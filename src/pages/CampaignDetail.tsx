@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { Campaign } from '../lib/types';
 import { isValidTC } from '../lib/tc';
-import DsNav from '../components/ds/DsNav';
+import { coverTone } from '../lib/cover';
 
 type ClaimResponse = {
   alreadyClaimed: boolean;
@@ -35,7 +35,7 @@ function ResultView({
     <div>
       {result.alreadyClaimed ? (
         <div className="ds-alert ds-alert--info">
-          <History size={18} />
+          <Info size={18} />
           <span>Bu kampanyadan daha önce kod almışsınız. Kodunuz aşağıda.</span>
         </div>
       ) : result.limitReached ? (
@@ -46,7 +46,7 @@ function ResultView({
       ) : (
         <div className="ds-alert ds-alert--success">
           <CheckCircle size={18} />
-          <span>Üyeliğiniz doğrulandı. Kodunuz hazır!</span>
+          <span>Üye doğrulama başarılı! Kampanya kodunuz teslim edildi.</span>
         </div>
       )}
 
@@ -54,7 +54,7 @@ function ResultView({
         const key = `r${i}`;
         return (
           <div className="ds-codebox" key={key}>
-            <div className="ds-codebox__label">Kodunuz</div>
+            <div className="ds-codebox__label">İndirim Kodunuz</div>
             <div className="ds-codebox__row">
               <span className="ds-codebox__code">{c}</span>
               <button className={`ds-copy${copiedKey === key ? ' copied' : ''}`} onClick={() => onCopy(c, key)}>
@@ -73,12 +73,7 @@ function ResultView({
         );
       })}
 
-      <Link
-        to="/kodlarim"
-        state={{ tc }}
-        className="ds-btn ds-btn--ghost ds-btn--block"
-        style={{ marginTop: '0.25rem' }}
-      >
+      <Link to="/kodlarim" state={{ tc }} className="ds-btn ds-btn--ghost ds-btn--block" style={{ marginTop: '0.25rem' }}>
         Tüm kodlarım <ArrowRight size={15} />
       </Link>
       <button
@@ -87,7 +82,7 @@ function ResultView({
         style={{ marginTop: '0.6rem', background: 'transparent', color: 'var(--ds-ink-soft)', border: 'none', minHeight: 'auto' }}
         onClick={onHome}
       >
-        Ana sayfaya dön
+        Ana ekrana dön
       </button>
     </div>
   );
@@ -113,7 +108,6 @@ export default function CampaignDetail() {
       .then((r) => (r.ok ? (r.json() as Promise<Campaign>) : Promise.reject(new Error('not-found'))))
       .then((c) => {
         if (!alive) return;
-        // Arşiv/pasif → herkese açık değil, vitrine yönlendir.
         if (c.status === 'archived' || c.status === 'inactive') {
           navigate('/');
           return;
@@ -156,7 +150,6 @@ export default function CampaignDetail() {
         body: JSON.stringify({ tc_no: tcNo, campaign_slug: campaign.slug }),
       });
       const data = (await res.json()) as ClaimResponse;
-      // 503 = doğrulama servisine ulaşılamadı; üyeyle ilgili değil.
       if (res.status === 503) {
         setServiceDown(true);
         return;
@@ -173,9 +166,10 @@ export default function CampaignDetail() {
   if (loading || !campaign) {
     return (
       <div className="ds">
-        <DsNav />
-        <div className="ds-container">
-          <div className="ds-skel" style={{ height: '380px', maxWidth: '600px', margin: '1.5rem auto' }} />
+        <div className="ds-detail-cover ds-cover-ph ds-cover-ph--navy">
+          <div className="ds-glass">
+            <div className="ds-skel" style={{ height: '320px' }} />
+          </div>
         </div>
       </div>
     );
@@ -188,22 +182,20 @@ export default function CampaignDetail() {
   const tcOk = tcNo.length === 11 && isValidTC(tcNo);
   const tcBad = tcNo.length === 11 && !isValidTC(tcNo);
   const formClosed = scheduled || expired;
+  const partner = campaign.partner_name ?? '';
+  const tone = coverTone(campaign.slug || partner || campaign.title);
+  const coverCls = campaign.cover_image_url ? 'ds-detail-cover' : `ds-detail-cover ds-cover-ph ds-cover-ph--${tone}`;
 
   return (
     <div className="ds">
-      <DsNav />
-      <div className="ds-container">
-        <Link to="/" className="ds-back">
+      <div className={coverCls}>
+        {campaign.cover_image_url && <img src={campaign.cover_image_url} alt="" />}
+        <Link to="/" className="ds-backfloat">
           <ArrowLeft size={16} /> Kampanyalar
         </Link>
 
-        <div className="ds-claim">
-          {campaign.cover_image_url && (
-            <div className="ds-cover">
-              <img src={campaign.cover_image_url} alt={campaign.title} />
-            </div>
-          )}
-
+        <div className="ds-glass">
+          {/* Logolar */}
           <div className="ds-logos">
             <img
               src="/talpa-logo.webp"
@@ -212,21 +204,25 @@ export default function CampaignDetail() {
                 e.currentTarget.style.display = 'none';
               }}
             />
-            {campaign.partner_logo_url && (
+            {(campaign.partner_logo_url || partner) && (
               <>
                 <span className="sep" />
-                <img
-                  src={campaign.partner_logo_url}
-                  alt={campaign.partner_name ?? ''}
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
+                {campaign.partner_logo_url ? (
+                  <img
+                    src={campaign.partner_logo_url}
+                    alt={partner}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span style={{ fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{partner}</span>
+                )}
               </>
             )}
           </div>
 
-          <h1 className="ds-claim__title">{campaign.title}</h1>
+          <h1 className="ds-glass__heading">{campaign.title}</h1>
           {campaign.description && <p className="ds-claim__sub">{campaign.description}</p>}
           <div className="ds-claim__discount">
             <Tag size={16} /> {campaign.discount_label}
@@ -321,7 +317,7 @@ export default function CampaignDetail() {
                     maxLength={11}
                     autoComplete="off"
                     autoFocus
-                    placeholder="11 haneli TCKN"
+                    placeholder="11 haneli TCKN giriniz"
                     value={tcNo}
                     disabled={submitting || soldOut}
                     onChange={(e) => {
@@ -349,25 +345,23 @@ export default function CampaignDetail() {
                 </div>
               </div>
 
-              <div className="ds-sticky">
-                <button
-                  type="submit"
-                  className="ds-btn ds-btn--accent ds-btn--block"
-                  disabled={submitting || tcNo.length !== 11 || soldOut}
-                >
-                  {soldOut ? (
-                    'Tükendi'
-                  ) : submitting ? (
-                    <>
-                      <Loader2 size={18} className="ds-spin" /> Doğrulanıyor…
-                    </>
-                  ) : (
-                    <>
-                      <Gift size={18} /> Kodumu Al
-                    </>
-                  )}
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="ds-btn ds-btn--accent ds-btn--block"
+                disabled={submitting || tcNo.length !== 11 || soldOut}
+              >
+                {soldOut ? (
+                  'Tükendi'
+                ) : submitting ? (
+                  <>
+                    <Loader2 size={18} className="ds-spin" /> Doğrulanıyor…
+                  </>
+                ) : (
+                  <>
+                    <Gift size={18} /> İndirim Kodumu Al
+                  </>
+                )}
+              </button>
             </form>
           )}
 
