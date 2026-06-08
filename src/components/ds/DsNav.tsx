@@ -8,7 +8,6 @@ export default function DsNav() {
       <div className="ds-nav__inner">
         <Link to="/" className="ds-nav__brand">
           <img src="/talpa-logo.webp" alt="TALPA" />
-          <span>TALPA Ayrıcalıklar</span>
         </Link>
         <div className="ds-nav__links">
           <NavLink to="/arsiv" className="ds-nav__link">

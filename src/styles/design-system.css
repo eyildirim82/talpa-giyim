@@ -105,7 +105,7 @@
   text-decoration: none;
   letter-spacing: -0.01em;
 }
-.ds-nav__brand img { height: 34px; width: auto; flex: 0 0 auto; object-fit: contain; display: block; }
+.ds-nav__brand img { height: 52px; width: auto; flex: 0 0 auto; object-fit: contain; display: block; }
 
 /* Beyaz logo "tile"ı — logoyu olduğu gibi (orijinal renk/zemin) beyaz bir
    zemine oturtur. Koyu zeminlerde (lacivert kenar çubuğu, koyu hero kapağı)
@@ -120,9 +120,9 @@
   padding: 5px 8px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
-.ds-logo-chip img { display: block; width: auto; height: 100%; max-width: 160px; object-fit: contain; }
+.ds-logo-chip img { display: block; width: auto; height: 100%; max-width: 200px; object-fit: contain; }
 /* Bağlama göre tile yüksekliği */
-.ds-fhero .ds-logo-chip { height: 42px; }
+.ds-fhero .ds-logo-chip { height: 56px; }
 .ds-side__brand .ds-logo-chip { height: 40px; }
 .ds-nav__links { display: flex; align-items: center; gap: 0.25rem; }
 .ds-nav__link {
@@ -384,8 +384,8 @@
   padding: 1.15rem 1.2rem 1.3rem;
   flex: 1;
 }
-.ds-camp__brand { display: flex; align-items: center; min-height: 22px; font-size: 0.8125rem; font-weight: 600; color: var(--ds-ink-soft); }
-.ds-camp__brand img { height: 22px; width: auto; max-width: 130px; object-fit: contain; display: block; }
+.ds-camp__brand { display: flex; align-items: center; min-height: 34px; font-size: 0.8125rem; font-weight: 600; color: var(--ds-ink-soft); }
+.ds-camp__brand img { height: 34px; width: auto; max-width: 170px; object-fit: contain; display: block; }
 .ds-camp__title { margin: 0; font-size: 1.0625rem; font-weight: 700; line-height: 1.3; color: var(--ds-ink); }
 .ds-camp__desc {
   margin: 0;
@@ -488,8 +488,8 @@
   flex-wrap: wrap;
   margin-bottom: 1.5rem;
 }
-.ds-logos img { height: 48px; width: auto; max-width: 180px; object-fit: contain; }
-.ds-logos .sep { width: 1px; height: 34px; background: var(--ds-border-strong); }
+.ds-logos img { height: 64px; width: auto; max-width: 240px; object-fit: contain; }
+.ds-logos .sep { width: 1px; height: 44px; background: var(--ds-border-strong); }
 
 .ds-claim__title {
   font-size: clamp(1.4rem, 4vw, 1.9rem);
