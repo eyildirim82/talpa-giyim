@@ -90,15 +90,6 @@ export default function Home() {
       <DsNav />
 
       <div className="ds-container">
-        <header className="ds-hero">
-          <span className="ds-eyebrow">Üyelere Özel</span>
-          <h1 className="ds-h1">Ayrıcalıklarınız</h1>
-          <p className="ds-sub">
-            TALPA üyeliğinize özel, anlaşmalı markalarda geçerli indirim kodları. Kampanyayı seçin,
-            T.C. kimlik numaranızla doğrulayın, kodunuz anında sizin olsun.
-          </p>
-        </header>
-
         {loading ? (
           <div className="ds-grid">
             {[1, 2, 3].map((i) => (
