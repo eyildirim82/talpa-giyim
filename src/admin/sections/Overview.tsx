@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAdmin } from '../ctx';
+import SystemHealthDS from '../SystemHealthDS';
 
 type Stats = {
   totalCampaigns: number;
@@ -41,10 +42,7 @@ export default function Overview() {
     <div>
       <h1 className="ds-admin__title" style={{ marginBottom: '1rem' }}>Genel Bakış</h1>
 
-      <div className="ds-alert ds-alert--info" style={{ marginBottom: '1.25rem' }}>
-        Sistem Sağlığı paneli (servis durumu · sistem nabzı · stok) buraya eklenecek — mevcut SystemHealth
-        bileşeni açık temaya uyarlanacak.
-      </div>
+      <SystemHealthDS />
 
       <div className="ds-stats">
         <Stat label="Toplam Kampanya" value={stats?.totalCampaigns} />
