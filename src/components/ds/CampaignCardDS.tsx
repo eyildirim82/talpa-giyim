@@ -47,14 +47,13 @@ export default function CampaignCardDS({
       <div className="ds-camp__body">
         <div className="ds-camp__brand">
           {campaign.partner_logo_url && logoOk ? (
-            <span className="ds-logo-chip">
-              <img
-                src={campaign.partner_logo_url}
-                alt={partner}
-                loading="lazy"
-                onError={() => setLogoOk(false)}
-              />
-            </span>
+            <img
+              className="ds-brandmark"
+              src={campaign.partner_logo_url}
+              alt={partner}
+              loading="lazy"
+              onError={() => setLogoOk(false)}
+            />
           ) : (
             partner
           )}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Tag, Calendar, ArrowRight } from 'lucide-react';
 import type { Campaign } from '../../lib/types';
@@ -10,6 +11,7 @@ export default function FeaturedHeroDS({ campaign }: { campaign: Campaign }) {
   const lowStock = !soldOut && campaign.is_low_stock;
   const partner = campaign.partner_name ?? campaign.title;
   const tone = coverTone(campaign.slug || partner);
+  const [logoOk, setLogoOk] = useState(true);
 
   return (
     <Link
@@ -20,9 +22,19 @@ export default function FeaturedHeroDS({ campaign }: { campaign: Campaign }) {
       <div className="ds-fhero__scrim" />
       <div className="ds-fhero__body">
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
-          <span style={{ fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontSize: '1rem' }}>
-            {partner}
-          </span>
+          {campaign.partner_logo_url && logoOk ? (
+            <img
+              className="ds-brandmark--light"
+              src={campaign.partner_logo_url}
+              alt={partner}
+              onError={() => setLogoOk(false)}
+              style={{ height: 32, width: 'auto', maxWidth: 200, objectFit: 'contain', display: 'block' }}
+            />
+          ) : (
+            <span style={{ fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontSize: '1rem' }}>
+              {partner}
+            </span>
+          )}
           <Badge tone="accent">
             <Tag size={11} /> {campaign.discount_label}
           </Badge>
